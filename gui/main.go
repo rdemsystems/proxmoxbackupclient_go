@@ -39,7 +39,7 @@ func init() {
 	// Setup debug log file in user home
 	homeDir, _ := os.UserHomeDir()
 	logDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
-	os.MkdirAll(logDir, 0700)
+	_ = os.MkdirAll(logDir, 0700)
 	debugLogPath = filepath.Join(logDir, "debug.log")
 
 	// Setup panic recovery
@@ -137,7 +137,7 @@ func writeDebugLog(message string) {
 		return
 	}
 	defer f.Close()
-	f.WriteString(logLine)
+	_, _ = f.WriteString(logLine)
 
 	// Also write to stderr for console visibility
 	fmt.Fprint(os.Stderr, logLine)
