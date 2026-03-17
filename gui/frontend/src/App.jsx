@@ -237,6 +237,12 @@ function App() {
         <div className={`tab-content ${activeTab === 'config' ? 'active' : ''}`}>
           <h2>Configuration du serveur PBS</h2>
 
+          {hostname && (
+            <div className="info-box" style={{marginBottom: '20px'}}>
+              🖥️ <strong>Machine détectée :</strong> {hostname}
+            </div>
+          )}
+
           <div className="form-group">
             <label>URL du serveur PBS</label>
             <input

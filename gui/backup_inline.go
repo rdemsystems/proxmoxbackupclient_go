@@ -135,21 +135,6 @@ func RunBackupInline(opts BackupOptions) error {
 
 	progress(0.50, "Uploading data to PBS...")
 
-	// Simulate backup progress for now
-	// TODO: Implement actual PXAR creation and upload
-	for i := 50; i <= 95; i += 5 {
-		progress(float64(i)/100.0, fmt.Sprintf("Processing files... %d%%", i))
-		time.Sleep(100 * time.Millisecond) // Simulate work
-	}
-
-	progress(0.95, "Finalizing backup...")
-	progress(1.0, "Backup completed")
-
-	writeDebugLog("Backup completed successfully")
-	if opts.OnComplete != nil {
-		opts.OnComplete(true, "Backup completed successfully")
-	}
-
 	// TODO: Full implementation requires:
 	// - PXAR archive creation
 	// - Chunking and deduplication (using pbscommon.Chunker)
@@ -160,5 +145,10 @@ func RunBackupInline(opts BackupOptions) error {
 
 	_ = client // Will be used in full implementation
 
-	return fmt.Errorf("Backup implementation in progress - PXAR creation and upload logic needed")
+	errMsg := "Fonctionnalité de backup non encore implémentée. L'implémentation complète nécessite l'intégration du code PXAR et de l'upload vers PBS."
+	writeDebugLog(errMsg)
+	if opts.OnComplete != nil {
+		opts.OnComplete(false, errMsg)
+	}
+	return fmt.Errorf(errMsg)
 }
