@@ -53,7 +53,8 @@ function App() {
     }
   }, [config['backup-id'], hostname])
 
-  // Load physical disks when switching to machine mode
+  // Load physical disks when switching to machine mode (DISABLED FOR NOW)
+  /*
   useEffect(() => {
     if (backupType === 'machine' && ListPhysicalDisks && physicalDisks.length === 0) {
       ListPhysicalDisks().then(disks => {
@@ -67,6 +68,7 @@ function App() {
       })
     }
   }, [backupType])
+  */
 
   // Listen to backup events
   useEffect(() => {
@@ -413,7 +415,7 @@ function App() {
             <label>Type de sauvegarde</label>
             <select value={backupType} onChange={(e) => setBackupType(e.target.value)}>
               <option value="directory">📁 Répertoire (dossier spécifique)</option>
-              <option value="machine">💾 Machine (disque complet)</option>
+              {/* <option value="machine">💾 Machine (disque complet)</option> */}
             </select>
           </div>
 

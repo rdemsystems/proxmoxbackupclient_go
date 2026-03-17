@@ -230,7 +230,8 @@ func (a *App) GetHostname() string {
 	return hostname
 }
 
-// ListPhysicalDisks returns a list of available physical disks
+// ListPhysicalDisks returns a list of available physical disks (DISABLED - feature postponed)
+/*
 func (a *App) ListPhysicalDisks() ([]PhysicalDiskInfo, error) {
 	writeDebugLog("ListPhysicalDisks() called from frontend")
 	disks, err := ListPhysicalDisks()
@@ -241,6 +242,7 @@ func (a *App) ListPhysicalDisks() ([]PhysicalDiskInfo, error) {
 	writeDebugLog(fmt.Sprintf("Found %d physical disks", len(disks)))
 	return disks, nil
 }
+*/
 
 // GetConfigWithHostname returns config with hostname pre-filled
 func (a *App) GetConfigWithHostname() map[string]interface{} {
@@ -378,13 +380,12 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 	// Run backup inline (in background goroutine to not block UI)
 	go func() {
 		var err error
-		if backupType == "machine" {
-			// Physical disk backup
-			err = RunMachineBackup(opts)
-		} else {
-			// Directory backup
-			err = RunBackupInline(opts)
-		}
+		// Machine backup disabled for now - Windows Defender flags it
+		// if backupType == "machine" {
+		// 	err = RunMachineBackup(opts)
+		// } else {
+		err = RunBackupInline(opts)
+		// }
 		if err != nil {
 			writeDebugLog(fmt.Sprintf("Backup error: %v", err))
 		}
