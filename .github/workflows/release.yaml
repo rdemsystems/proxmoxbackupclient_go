@@ -4,7 +4,7 @@ name: Release Automation
 on:
   push:
     tags:
-      - "*" # triggers when pushing a new tag like `0.8.4`
+      - "v[0-9]*.[0-9]*.[0-9]*" # triggers on version tags like v0.8.4 (but not v0.0.1-gui)
 
 concurrency: ci-release-automation
 
