@@ -38,7 +38,7 @@ func init() {
 
 	// Setup debug log file in user home
 	homeDir, _ := os.UserHomeDir()
-	logDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
+	logDir := filepath.Join(homeDir, ".nimbus-backup")
 	_ = os.MkdirAll(logDir, 0700)
 	debugLogPath = filepath.Join(logDir, "debug.log")
 
