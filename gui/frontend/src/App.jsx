@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 // Wails runtime imports (will be available when built with Wails)
-let GetConfig, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot
+let GetConfig, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, GetHostname
 
 // Check if we're running in Wails
 if (window.go) {
@@ -11,6 +11,7 @@ if (window.go) {
   StartBackup = window.go.main.App.StartBackup
   ListSnapshots = window.go.main.App.ListSnapshots
   RestoreSnapshot = window.go.main.App.RestoreSnapshot
+  GetHostname = window.go.main.App.GetHostname
 }
 
 function App() {
@@ -41,7 +42,17 @@ function App() {
   useEffect(() => {
     if (GetConfig) {
       GetConfig().then(cfg => {
-        if (cfg) setConfig(cfg)
+        if (cfg) {
+          setConfig(cfg)
+          // Pre-fill backup-id with hostname if empty
+          if (!cfg['backup-id'] && GetHostname) {
+            GetHostname().then(hostname => {
+              if (hostname) {
+                setConfig(c => ({ ...c, 'backup-id': hostname }))
+              }
+            })
+          }
+        }
       }).catch(err => {
         console.error('Failed to load config:', err)
       })
@@ -433,7 +444,7 @@ function App() {
 
           <div style={{textAlign: 'center', marginTop: '30px'}}>
             <h3>Nimbus Backup</h3>
-            <p style={{color: '#718096', margin: '10px 0'}}>Version 0.4.0</p>
+            <p style={{color: '#718096', margin: '10px 0'}}>Version 0.0.7</p>
 
             <div className="grid" style={{marginTop: '30px', textAlign: 'left'}}>
               <div className="card">

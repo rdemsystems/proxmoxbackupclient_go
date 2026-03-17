@@ -22,7 +22,7 @@ var assets embed.FS
 
 const (
 	appName    = "Nimbus Backup"
-	appVersion = "0.4.0"
+	appVersion = "0.0.7"
 )
 
 var (
@@ -208,6 +208,17 @@ func (a *App) shutdown(ctx context.Context) {
 func (a *App) GetConfig() *Config {
 	writeDebugLog("GetConfig() called from frontend")
 	return a.config
+}
+
+// GetHostname returns the system hostname
+func (a *App) GetHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("GetHostname() error: %v", err))
+		return ""
+	}
+	writeDebugLog(fmt.Sprintf("GetHostname() returned: %s", hostname))
+	return hostname
 }
 
 // SaveConfig saves the configuration

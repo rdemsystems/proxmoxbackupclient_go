@@ -94,8 +94,5 @@ func (c *Config) Validate() error {
 	if c.Datastore == "" {
 		return fmt.Errorf("Datastore requis")
 	}
-	if c.BackupDir == "" {
-		return fmt.Errorf("Répertoire de sauvegarde requis")
-	}
 	return nil
 }
