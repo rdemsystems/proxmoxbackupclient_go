@@ -35,7 +35,7 @@ function App() {
 
   const [backupType, setBackupType] = useState('directory')
   const [backupDirs, setBackupDirs] = useState('')
-  const [selectedDrives, setSelectedDrives] = useState(['C:'])
+  const [selectedDrives, setSelectedDrives] = useState(['\\\\.\\PhysicalDrive0'])
   const [excludeList, setExcludeList] = useState('')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState({ message: '', type: '', visible: false })
@@ -418,24 +418,27 @@ function App() {
           ) : (
             <>
               <div className="form-group">
-                <label>Disques à sauvegarder</label>
+                <label>Disques physiques à sauvegarder</label>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                  {['C:', 'D:', 'E:', 'F:', 'G:', 'H:'].map(drive => (
-                    <label key={drive} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                      <input
-                        type="checkbox"
-                        checked={selectedDrives.includes(drive)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedDrives([...selectedDrives, drive])
-                          } else {
-                            setSelectedDrives(selectedDrives.filter(d => d !== drive))
-                          }
-                        }}
-                      />
-                      {drive}\ {drive === 'C:' && '(Disque système)'}
-                    </label>
-                  ))}
+                  {[0, 1, 2, 3].map(driveNum => {
+                    const drivePath = `\\\\.\\PhysicalDrive${driveNum}`
+                    return (
+                      <label key={drivePath} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDrives.includes(drivePath)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedDrives([...selectedDrives, drivePath])
+                            } else {
+                              setSelectedDrives(selectedDrives.filter(d => d !== drivePath))
+                            }
+                          }}
+                        />
+                        PhysicalDrive{driveNum} {driveNum === 0 && '(Disque système)'}
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
 

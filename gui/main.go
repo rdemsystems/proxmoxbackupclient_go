@@ -329,17 +329,10 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 	}
 	if backupType == "machine" {
 		if len(driveLetters) == 0 {
-			return fmt.Errorf("Au moins une lettre de lecteur requise")
+			return fmt.Errorf("Au moins un disque physique requis")
 		}
-		// Ensure drive letters have trailing backslash for root access
-		targetDirs = make([]string, len(driveLetters))
-		for i, drive := range driveLetters {
-			if len(drive) == 2 && drive[1] == ':' {
-				targetDirs[i] = drive + "\\"
-			} else {
-				targetDirs[i] = drive
-			}
-		}
+		// Physical drive paths are used directly (e.g., \\.\PhysicalDrive0)
+		targetDirs = driveLetters
 	}
 
 	// Prepare backup options
@@ -372,7 +365,14 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 
 	// Run backup inline (in background goroutine to not block UI)
 	go func() {
-		err := RunBackupInline(opts)
+		var err error
+		if backupType == "machine" {
+			// Physical disk backup
+			err = RunMachineBackup(opts)
+		} else {
+			// Directory backup
+			err = RunBackupInline(opts)
+		}
 		if err != nil {
 			writeDebugLog(fmt.Sprintf("Backup error: %v", err))
 		}
