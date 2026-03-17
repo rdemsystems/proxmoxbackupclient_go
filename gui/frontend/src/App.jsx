@@ -445,6 +445,12 @@ function App() {
               />
               Utiliser VSS (Windows Shadow Copy)
             </label>
+            {config.usevss && (
+              <div className="info-box" style={{marginTop: '10px', backgroundColor: '#fff3cd', borderColor: '#ffc107'}}>
+                ⚠️ <strong>VSS nécessite des privilèges administrateur.</strong><br/>
+                Redémarrez l'application en tant qu'administrateur (clic droit → Exécuter en tant qu'administrateur) pour utiliser VSS.
+              </div>
+            )}
           </div>
 
           <div className="progress">
