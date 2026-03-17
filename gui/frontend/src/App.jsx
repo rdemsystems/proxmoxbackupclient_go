@@ -29,7 +29,8 @@ function App() {
   })
 
   const [backupType, setBackupType] = useState('directory')
-  const [driveLetter, setDriveLetter] = useState('C:')
+  const [backupDirs, setBackupDirs] = useState('')
+  const [selectedDrives, setSelectedDrives] = useState(['C:'])
   const [excludeList, setExcludeList] = useState('')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState({ message: '', type: '', visible: false })
@@ -61,6 +62,11 @@ function App() {
               'backup-id': data['backup-id'] || hn,
               usevss: data.usevss !== undefined ? data.usevss : true
             })
+
+            // Initialize backupDirs from config if available
+            if (data.backupdir) {
+              setBackupDirs(data.backupdir)
+            }
           }
         }
       } catch (err) {
@@ -129,8 +135,16 @@ function App() {
       return
     }
 
-    if (backupType === 'directory' && !config.backupdir) {
-      showStatus('❌ Répertoire requis', 'error')
+    // Parse backup directories (one per line)
+    const dirList = backupDirs.split('\n').map(d => d.trim()).filter(d => d)
+
+    if (backupType === 'directory' && dirList.length === 0) {
+      showStatus('❌ Au moins un répertoire requis', 'error')
+      return
+    }
+
+    if (backupType === 'machine' && selectedDrives.length === 0) {
+      showStatus('❌ Au moins un disque requis', 'error')
       return
     }
 
@@ -140,8 +154,8 @@ function App() {
     try {
       await StartBackup(
         backupType,
-        config.backupdir,
-        driveLetter,
+        dirList,
+        selectedDrives,
         excludeList.split('\n').filter(l => l.trim()),
         config['backup-id'],
         config.usevss
@@ -324,24 +338,41 @@ function App() {
 
           {backupType === 'directory' ? (
             <div className="form-group">
-              <label>Répertoire à sauvegarder</label>
-              <input
-                type="text"
-                value={config.backupdir}
-                onChange={(e) => setConfig({...config, backupdir: e.target.value})}
-                placeholder="C:\Data ou C:\Users"
+              <label>Répertoires à sauvegarder (un par ligne)</label>
+              <textarea
+                value={backupDirs}
+                onChange={(e) => {
+                  setBackupDirs(e.target.value)
+                  // Update config.backupdir with first directory for compatibility
+                  const dirs = e.target.value.split('\n').map(d => d.trim()).filter(d => d)
+                  setConfig({...config, backupdir: dirs[0] || ''})
+                }}
+                rows="4"
+                placeholder="C:\Data&#10;C:\Users&#10;D:\Documents"
               />
             </div>
           ) : (
             <>
               <div className="form-group">
-                <label>Disque à sauvegarder</label>
-                <select value={driveLetter} onChange={(e) => setDriveLetter(e.target.value)}>
-                  <option value="C:">C:\ (Disque système)</option>
-                  <option value="D:">D:\</option>
-                  <option value="E:">E:\</option>
-                  <option value="F:">F:\</option>
-                </select>
+                <label>Disques à sauvegarder</label>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                  {['C:', 'D:', 'E:', 'F:', 'G:', 'H:'].map(drive => (
+                    <label key={drive} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDrives.includes(drive)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDrives([...selectedDrives, drive])
+                          } else {
+                            setSelectedDrives(selectedDrives.filter(d => d !== drive))
+                          }
+                        }}
+                      />
+                      {drive}\ {drive === 'C:' && '(Disque système)'}
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <div className="form-group">

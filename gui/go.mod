@@ -2,7 +2,12 @@ module github.com/tizbac/proxmoxbackupclient_go/gui
 
 go 1.21
 
-require github.com/wailsapp/wails/v2 v2.8.0
+require (
+	github.com/wailsapp/wails/v2 v2.8.0
+	clientcommon v0.0.0
+	pbscommon v0.0.0
+	snapshot v0.0.0
+)
 
 require (
 	github.com/bep/debounce v1.2.1 // indirect
@@ -32,4 +37,11 @@ require (
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
+)
+
+// Local package replacements to use sibling directories
+replace (
+	clientcommon => ../clientcommon
+	pbscommon => ../pbscommon
+	snapshot => ../snapshot
 )
