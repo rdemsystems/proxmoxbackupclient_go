@@ -11,6 +11,7 @@ import (
 	"pbscommon"
 	"regexp"
 	"snapshot"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -92,6 +93,16 @@ type Partition struct {
 	RequiresVSS bool
 	Skip        bool
 	Letter      string
+}
+
+// PhysicalDiskInfo contains information about a physical disk
+type PhysicalDiskInfo struct {
+	DiskNumber int      `json:"diskNumber"`
+	SizeBytes  int64    `json:"sizeBytes"`
+	SizeText   string   `json:"sizeText"`
+	Letters    []string `json:"letters"`
+	Label      string   `json:"label"`
+	Path       string   `json:"path"`
 }
 
 func enumVolumeDiskOffset() ([]VolumeLetterAssign, error) {
@@ -238,6 +249,76 @@ func BytesToString(b int64) string {
 		return fmt.Sprintf("%dMB", b/(1024*1024))
 	}
 	return fmt.Sprintf("%dGB", b/(1024*1024*1024))
+}
+
+// ListPhysicalDisks returns a list of available physical disks with their information
+func ListPhysicalDisks() ([]PhysicalDiskInfo, error) {
+	writeDebugLog("Enumerating physical disks...")
+
+	// Get volume to disk mapping
+	vols, err := enumVolumeDiskOffset()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to enumerate volumes: %v", err)
+	}
+
+	// Group letters by disk number
+	diskLetters := make(map[int][]string)
+	for _, v := range vols {
+		diskNum := int(v.DiskNumber)
+		for _, letter := range v.Letters {
+			// Extract just the drive letter (e.g., "C:" from "C:\")
+			letter = strings.TrimRight(letter, "\\")
+			if !contains(diskLetters[diskNum], letter) {
+				diskLetters[diskNum] = append(diskLetters[diskNum], letter)
+			}
+		}
+	}
+
+	// Try to enumerate disks 0-9
+	disks := make([]PhysicalDiskInfo, 0)
+	for i := 0; i < 10; i++ {
+		diskPath := fmt.Sprintf("\\\\.\\PhysicalDrive%d", i)
+		size, err := GetDiskLength(diskPath)
+		if err != nil {
+			// Disk doesn't exist or can't be accessed
+			continue
+		}
+
+		letters := diskLetters[i]
+		if letters == nil {
+			letters = []string{}
+		}
+		sort.Strings(letters)
+
+		// Build label
+		label := fmt.Sprintf("Disque %d", i)
+		if len(letters) > 0 {
+			label += fmt.Sprintf(" (%s)", strings.Join(letters, ", "))
+		}
+		label += fmt.Sprintf(" - %s", BytesToString(size))
+
+		disks = append(disks, PhysicalDiskInfo{
+			DiskNumber: i,
+			SizeBytes:  size,
+			SizeText:   BytesToString(size),
+			Letters:    letters,
+			Label:      label,
+			Path:       diskPath,
+		})
+
+		writeDebugLog(fmt.Sprintf("Found: %s", label))
+	}
+
+	return disks, nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 type MachineChunkState struct {

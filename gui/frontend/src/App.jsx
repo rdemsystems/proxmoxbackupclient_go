@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 // Wails runtime imports (will be available when built with Wails)
-let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, EventsOn
+let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, ListPhysicalDisks, EventsOn
 
 // Check if we're running in Wails
 if (window.go) {
@@ -11,6 +11,7 @@ if (window.go) {
   StartBackup = window.go.main.App.StartBackup
   ListSnapshots = window.go.main.App.ListSnapshots
   RestoreSnapshot = window.go.main.App.RestoreSnapshot
+  ListPhysicalDisks = window.go.main.App.ListPhysicalDisks
 }
 
 // Wails events
@@ -35,7 +36,8 @@ function App() {
 
   const [backupType, setBackupType] = useState('directory')
   const [backupDirs, setBackupDirs] = useState('')
-  const [selectedDrives, setSelectedDrives] = useState(['\\\\.\\PhysicalDrive0'])
+  const [selectedDrives, setSelectedDrives] = useState([])
+  const [physicalDisks, setPhysicalDisks] = useState([])
   const [excludeList, setExcludeList] = useState('')
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState({ message: '', type: '', visible: false })
@@ -50,6 +52,21 @@ function App() {
       setRestoreBackupId(config['backup-id'] || hostname)
     }
   }, [config['backup-id'], hostname])
+
+  // Load physical disks when switching to machine mode
+  useEffect(() => {
+    if (backupType === 'machine' && ListPhysicalDisks && physicalDisks.length === 0) {
+      ListPhysicalDisks().then(disks => {
+        setPhysicalDisks(disks)
+        // Select first disk by default
+        if (disks.length > 0 && selectedDrives.length === 0) {
+          setSelectedDrives([disks[0].path])
+        }
+      }).catch(err => {
+        showStatus(`❌ Erreur lors de la détection des disques: ${err}`, 'error')
+      })
+    }
+  }, [backupType])
 
   // Listen to backup events
   useEffect(() => {
@@ -419,27 +436,30 @@ function App() {
             <>
               <div className="form-group">
                 <label>Disques physiques à sauvegarder</label>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                  {[0, 1, 2, 3].map(driveNum => {
-                    const drivePath = `\\\\.\\PhysicalDrive${driveNum}`
-                    return (
-                      <label key={drivePath} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                {physicalDisks.length === 0 ? (
+                  <div style={{padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px'}}>
+                    🔍 Chargement des disques disponibles...
+                  </div>
+                ) : (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                    {physicalDisks.map(disk => (
+                      <label key={disk.path} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                         <input
                           type="checkbox"
-                          checked={selectedDrives.includes(drivePath)}
+                          checked={selectedDrives.includes(disk.path)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedDrives([...selectedDrives, drivePath])
+                              setSelectedDrives([...selectedDrives, disk.path])
                             } else {
-                              setSelectedDrives(selectedDrives.filter(d => d !== drivePath))
+                              setSelectedDrives(selectedDrives.filter(d => d !== disk.path))
                             }
                           }}
                         />
-                        PhysicalDrive{driveNum} {driveNum === 0 && '(Disque système)'}
+                        {disk.label}
                       </label>
-                    )
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="form-group">

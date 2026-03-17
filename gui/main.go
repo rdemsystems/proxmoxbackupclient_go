@@ -230,6 +230,18 @@ func (a *App) GetHostname() string {
 	return hostname
 }
 
+// ListPhysicalDisks returns a list of available physical disks
+func (a *App) ListPhysicalDisks() ([]PhysicalDiskInfo, error) {
+	writeDebugLog("ListPhysicalDisks() called from frontend")
+	disks, err := ListPhysicalDisks()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("ListPhysicalDisks() error: %v", err))
+		return nil, err
+	}
+	writeDebugLog(fmt.Sprintf("Found %d physical disks", len(disks)))
+	return disks, nil
+}
+
 // GetConfigWithHostname returns config with hostname pre-filled
 func (a *App) GetConfigWithHostname() map[string]interface{} {
 	hostname := a.GetHostname()
