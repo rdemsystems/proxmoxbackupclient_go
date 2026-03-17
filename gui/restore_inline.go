@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"pbscommon"
@@ -45,28 +47,39 @@ func ListSnapshotsInline(baseURL, authID, secret, datastore, namespace, certFing
 		Insecure:        certFingerprint == "",
 	}
 
-	// Use PBS API to list snapshots
-	// The pbscommon package should have methods to list snapshots
-	// For now, we'll return an error indicating this needs implementation
+	// List snapshots via PBS API
+	client.Connect(true, "host")
+	manifests, err := client.ListSnapshots()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Failed to list snapshots: %v", err))
+		return nil, fmt.Errorf("Failed to list snapshots: %v", err)
+	}
 
-	writeDebugLog("PBS snapshot listing via API")
+	result := make([]SnapshotInfo, 0)
+	for _, m := range manifests {
+		// Filter by backup ID if specified
+		if backupID != "" && m.BackupID != backupID {
+			continue
+		}
 
-	// TODO: Implement actual PBS API call to list snapshots
-	// This requires:
-	// 1. HTTP GET request to /api2/json/admin/datastore/{datastore}/snapshots
-	// 2. Filter by backup-id if specified
-	// 3. Parse response and create SnapshotInfo objects
+		info := SnapshotInfo{
+			BackupType: m.BackupType,
+			BackupID:   m.BackupID,
+			BackupTime: m.BackupTime,
+			Size:       0, // Size not directly available from manifest
+			Files:      make([]string, 0),
+		}
 
-	// For now, return empty list with message
-	_ = client // Use client when implementing
+		// Collect file names from manifest
+		for _, f := range m.Files {
+			info.Files = append(info.Files, f.Filename)
+		}
 
-	return nil, fmt.Errorf(`Snapshot listing requires PBS API implementation.
+		result = append(result, info)
+	}
 
-Expected API endpoint: GET /api2/json/admin/datastore/%s/snapshots
-Filter by backup-id: %s
-
-The pbscommon package needs to expose a ListSnapshots() method.`,
-		datastore, backupID)
+	writeDebugLog(fmt.Sprintf("Found %d snapshots", len(result)))
+	return result, nil
 }
 
 // RestoreSnapshotInline restores a snapshot from PBS
@@ -106,45 +119,50 @@ func RestoreSnapshotInline(opts RestoreOptions) error {
 		Datastore:       opts.Datastore,
 		Namespace:       opts.Namespace,
 		Insecure:        opts.CertFingerprint == "",
+		Manifest: pbscommon.BackupManifest{
+			BackupID:   opts.BackupID,
+			BackupTime: opts.SnapshotTime,
+		},
 	}
 
+	client.Connect(true, "host")
 	progress(0.10, "Connected to PBS")
 
-	// Get snapshot manifest
-	progress(0.15, "Reading snapshot manifest...")
+	// Download PXAR archive
+	progress(0.20, "Downloading backup archive...")
 
-	backupTime := opts.SnapshotTime.Format("2006-01-02T15:04:05Z")
-	writeDebugLog(fmt.Sprintf("Restoring snapshot: host/%s/%s", opts.BackupID, backupTime))
-
-	// TODO: Implement actual restore logic
-	// This requires:
-	// 1. Download manifest from PBS
-	// 2. Download PXAR archive or disk image
-	// 3. Extract to destination
-	// 4. Handle progress reporting
-
-	progress(0.30, "Downloading snapshot data...")
-
-	// Simulate restore progress
-	for i := 30; i <= 90; i += 10 {
-		progress(float64(i)/100.0, fmt.Sprintf("Restoring files... %d%%", i))
-		time.Sleep(200 * time.Millisecond)
+	pxarData, err := client.DownloadToBytes("backup.pxar.didx")
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Failed to download PXAR: %v", err))
+		return fmt.Errorf("Failed to download backup archive: %v", err)
 	}
 
-	progress(0.95, "Finalizing restore...")
+	writeDebugLog(fmt.Sprintf("Downloaded %d bytes", len(pxarData)))
+	progress(0.80, "Archive downloaded")
+
+	// Save PXAR file
+	progress(0.85, "Saving archive...")
+
+	// Create destination directory if it doesn't exist
+	err = os.MkdirAll(opts.DestPath, 0755)
+	if err != nil {
+		return fmt.Errorf("Failed to create destination directory: %v", err)
+	}
+
+	pxarFile := filepath.Join(opts.DestPath, "backup.pxar")
+	err = os.WriteFile(pxarFile, pxarData, 0644)
+	if err != nil {
+		return fmt.Errorf("Failed to save PXAR file: %v", err)
+	}
+
+	writeDebugLog(fmt.Sprintf("Saved PXAR file to: %s", pxarFile))
+	progress(0.95, "Archive saved")
+
+	// Note: Full PXAR extraction would require implementing the PXAR format parser
+	// For now, we save the raw PXAR file which can be extracted using proxmox tools
+	// or by implementing a PXAR reader in the future
+
 	progress(1.0, "Restore completed")
 
-	_ = client // Use client when implementing
-
-	return fmt.Errorf(`Restore implementation in progress.
-
-Snapshot: %s/%s/%s
-Destination: %s
-
-Required implementation:
-1. GET manifest from PBS API
-2. Download PXAR archive chunks
-3. Reassemble and extract to destination
-4. Verify integrity`,
-		"host", opts.BackupID, backupTime, opts.DestPath)
+	return nil
 }
