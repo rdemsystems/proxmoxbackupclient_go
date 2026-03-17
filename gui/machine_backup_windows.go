@@ -20,7 +20,6 @@ import (
 
 	"crypto/sha256"
 	"encoding/hex"
-	"maps"
 	"math"
 	"slices"
 	"sync"
@@ -466,7 +465,10 @@ func uploadWorker(client *pbscommon.PBSClient, filename string, totalSize uint64
 	}
 
 	chunkdigests := sha256.New()
-	positions := slices.Collect(maps.Keys(CS.indexHashData))
+	positions := make([]uint64, 0, len(CS.indexHashData))
+	for k := range CS.indexHashData {
+		positions = append(positions, k)
+	}
 	slices.Sort(positions)
 	for _, P := range positions {
 		_, _ = chunkdigests.Write(CS.indexHashData[P])
