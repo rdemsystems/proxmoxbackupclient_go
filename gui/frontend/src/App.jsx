@@ -503,12 +503,37 @@ function App() {
             )}
           </div>
 
-          <div className="progress">
-            <div className="progress-bar" style={{width: `${progress}%`}}>{progress}%</div>
-          </div>
+          {progress > 0 && progress < 100 && (
+            <div style={{marginTop: '20px', marginBottom: '20px'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '5px'}}>
+                <strong>Progression du backup</strong>
+                <span>{progress}%</span>
+              </div>
+              <div className="progress" style={{height: '30px'}}>
+                <div
+                  className="progress-bar"
+                  style={{
+                    width: `${progress}%`,
+                    fontSize: '14px',
+                    lineHeight: '30px',
+                    transition: 'width 0.3s ease'
+                  }}
+                >
+                  {progress}%
+                </div>
+              </div>
+              {status.message && status.type === 'info' && (
+                <div style={{marginTop: '8px', fontSize: '13px', color: '#666'}}>
+                  {status.message}
+                </div>
+              )}
+            </div>
+          )}
 
-          <button className="btn" onClick={handleStartBackup}>Démarrer la sauvegarde</button>
-          <button className="btn btn-secondary" onClick={() => setProgress(0)}>Arrêter</button>
+          <button className="btn" onClick={handleStartBackup} disabled={progress > 0 && progress < 100}>
+            {progress > 0 && progress < 100 ? '⏳ Sauvegarde en cours...' : '🚀 Démarrer la sauvegarde'}
+          </button>
+          <button className="btn btn-secondary" onClick={() => setProgress(0)} disabled={progress === 0}>Arrêter</button>
 
           {status.visible && activeTab === 'backup' && (
             <div className={`status ${status.type} visible`}>{status.message}</div>
