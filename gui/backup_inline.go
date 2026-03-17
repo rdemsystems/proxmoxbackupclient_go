@@ -277,10 +277,12 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 
 	previousDidx, err := client.DownloadPreviousToBytes(archive.ArchiveName)
 	if err != nil {
-		return err
+		// This is normal for first backup - no previous backup exists
+		writeDebugLog(fmt.Sprintf("No previous backup found (first backup?): %v", err))
+		previousDidx = []byte{}
+	} else {
+		writeDebugLog(fmt.Sprintf("Downloaded previous DIDX: %d bytes", len(previousDidx)))
 	}
-
-	writeDebugLog(fmt.Sprintf("Downloaded previous DIDX: %d bytes", len(previousDidx)))
 
 	if bytes.HasPrefix(previousDidx, didxMagic) {
 		previousDidx = previousDidx[4096:]
