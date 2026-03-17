@@ -237,9 +237,9 @@ function App() {
         <div className={`tab-content ${activeTab === 'config' ? 'active' : ''}`}>
           <h2>Configuration du serveur PBS</h2>
 
-          {hostname && (
+          {(config['backup-id'] || hostname) && (
             <div className="info-box" style={{marginBottom: '20px'}}>
-              🖥️ <strong>Machine détectée :</strong> {hostname}
+              🖥️ <strong>Machine :</strong> {config['backup-id'] || hostname}
             </div>
           )}
 
