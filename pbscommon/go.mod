@@ -1,6 +1,6 @@
 module pbscommon
 
-go 1.24.4
+go 1.21
 
 require (
 	github.com/klauspost/compress v1.18.0

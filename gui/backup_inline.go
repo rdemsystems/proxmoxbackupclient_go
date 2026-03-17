@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
-	"clientcommon"
 	"pbscommon"
-	"snapshot"
 )
 
 // BackupOptions contains all parameters for a backup operation
@@ -65,35 +62,20 @@ func RunBackupInline(opts BackupOptions) error {
 
 	// Create PBS client
 	progress(0.05, "Connecting to PBS...")
-	client, err := pbscommon.NewPBSClient(
-		opts.BaseURL,
-		opts.AuthID,
-		opts.Secret,
-		opts.CertFingerprint,
-		opts.Datastore,
-		opts.Namespace,
-	)
-	if err != nil {
-		writeDebugLog(fmt.Sprintf("Failed to create PBS client: %v", err))
-		if opts.OnComplete != nil {
-			opts.OnComplete(false, fmt.Sprintf("Connection failed: %v", err))
-		}
-		return fmt.Errorf("failed to connect to PBS: %v", err)
+	client := &pbscommon.PBSClient{
+		BaseURL:         opts.BaseURL,
+		CertFingerPrint: opts.CertFingerprint,
+		AuthID:          opts.AuthID,
+		Secret:          opts.Secret,
+		Datastore:       opts.Datastore,
+		Namespace:       opts.Namespace,
+		Insecure:        opts.CertFingerprint == "",
 	}
 
 	progress(0.10, "Connected to PBS")
 
 	// Create backup snapshot
 	progress(0.15, "Creating snapshot...")
-	timestamp := time.Now()
-	backupTime := timestamp.Format("2006-01-02T15:04:05Z")
-
-	// Create snapshot info
-	snapInfo := snapshot.SnapshotInfo{
-		BackupType: opts.BackupType,
-		BackupID:   opts.BackupID,
-		BackupTime: timestamp,
-	}
 
 	// Start backup session
 	writeDebugLog(fmt.Sprintf("Starting backup for %s/%s/%s", opts.BackupType, opts.BackupID, backupTime))
@@ -158,10 +140,6 @@ func RunBackupInline(opts BackupOptions) error {
 	}
 
 	progress(0.95, "Finalizing backup...")
-
-	// Create manifest
-	_ = snapInfo // Use snapInfo for manifest creation
-
 	progress(1.0, "Backup completed")
 
 	writeDebugLog("Backup completed successfully")
@@ -170,12 +148,14 @@ func RunBackupInline(opts BackupOptions) error {
 	}
 
 	// TODO: Full implementation requires:
-	// - PXAR archive creation (using clientcommon package)
+	// - PXAR archive creation
 	// - Chunking and deduplication (using pbscommon.Chunker)
 	// - Dynamic chunk upload (client.UploadDynamicCompressedChunk)
 	// - Index creation and management
 	// - Manifest upload
 	// - Proper error handling throughout
+
+	_ = client // Will be used in full implementation
 
 	return fmt.Errorf("Backup implementation in progress - PXAR creation and upload logic needed")
 }

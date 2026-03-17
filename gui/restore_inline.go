@@ -35,17 +35,14 @@ func ListSnapshotsInline(baseURL, authID, secret, datastore, namespace, certFing
 	writeDebugLog(fmt.Sprintf("Listing snapshots for backup ID: %s", backupID))
 
 	// Create PBS client
-	client, err := pbscommon.NewPBSClient(
-		baseURL,
-		authID,
-		secret,
-		certFingerprint,
-		datastore,
-		namespace,
-	)
-	if err != nil {
-		writeDebugLog(fmt.Sprintf("Failed to create PBS client: %v", err))
-		return nil, fmt.Errorf("failed to connect to PBS: %v", err)
+	client := &pbscommon.PBSClient{
+		BaseURL:         baseURL,
+		CertFingerPrint: certFingerprint,
+		AuthID:          authID,
+		Secret:          secret,
+		Datastore:       datastore,
+		Namespace:       namespace,
+		Insecure:        certFingerprint == "",
 	}
 
 	// Use PBS API to list snapshots
@@ -101,17 +98,14 @@ func RestoreSnapshotInline(opts RestoreOptions) error {
 	progress(0.05, "Connecting to PBS...")
 
 	// Create PBS client
-	client, err := pbscommon.NewPBSClient(
-		opts.BaseURL,
-		opts.AuthID,
-		opts.Secret,
-		opts.CertFingerprint,
-		opts.Datastore,
-		opts.Namespace,
-	)
-	if err != nil {
-		writeDebugLog(fmt.Sprintf("Failed to create PBS client: %v", err))
-		return fmt.Errorf("failed to connect to PBS: %v", err)
+	client := &pbscommon.PBSClient{
+		BaseURL:         opts.BaseURL,
+		CertFingerPrint: opts.CertFingerprint,
+		AuthID:          opts.AuthID,
+		Secret:          opts.Secret,
+		Datastore:       opts.Datastore,
+		Namespace:       opts.Namespace,
+		Insecure:        opts.CertFingerprint == "",
 	}
 
 	progress(0.10, "Connected to PBS")
