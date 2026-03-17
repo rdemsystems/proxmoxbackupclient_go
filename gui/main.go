@@ -15,6 +15,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	wailswin "github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"pbscommon"
 )
 
@@ -347,11 +348,17 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 		UseVSS:          useVSS,
 		OnProgress: func(percent float64, message string) {
 			writeDebugLog(fmt.Sprintf("Progress: %.1f%% - %s", percent*100, message))
-			// TODO: Emit to frontend via Wails runtime events
+			runtime.EventsEmit(a.ctx, "backup:progress", map[string]interface{}{
+				"percent": percent * 100,
+				"message": message,
+			})
 		},
 		OnComplete: func(success bool, message string) {
 			writeDebugLog(fmt.Sprintf("Backup complete: success=%v, %s", success, message))
-			// TODO: Emit to frontend via Wails runtime events
+			runtime.EventsEmit(a.ctx, "backup:complete", map[string]interface{}{
+				"success": success,
+				"message": message,
+			})
 		},
 	}
 

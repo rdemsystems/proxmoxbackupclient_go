@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 // Wails runtime imports (will be available when built with Wails)
-let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot
+let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, EventsOn
 
 // Check if we're running in Wails
 if (window.go) {
@@ -11,6 +11,11 @@ if (window.go) {
   StartBackup = window.go.main.App.StartBackup
   ListSnapshots = window.go.main.App.ListSnapshots
   RestoreSnapshot = window.go.main.App.RestoreSnapshot
+}
+
+// Wails events
+if (window.runtime) {
+  EventsOn = window.runtime.EventsOn
 }
 
 function App() {
@@ -45,6 +50,26 @@ function App() {
       setRestoreBackupId(config['backup-id'] || hostname)
     }
   }, [config['backup-id'], hostname])
+
+  // Listen to backup events
+  useEffect(() => {
+    if (!EventsOn) return
+
+    const unsubProgress = EventsOn('backup:progress', (data) => {
+      setProgress(Math.round(data.percent))
+      showStatus(`🔄 ${data.message}`, 'info')
+    })
+
+    const unsubComplete = EventsOn('backup:complete', (data) => {
+      setProgress(data.success ? 100 : 0)
+      showStatus(data.success ? '✅ ' + data.message : '❌ ' + data.message, data.success ? 'success' : 'error')
+    })
+
+    return () => {
+      if (unsubProgress) unsubProgress()
+      if (unsubComplete) unsubComplete()
+    }
+  }, [])
 
   // Load config with hostname on mount
   useEffect(() => {
@@ -169,7 +194,7 @@ function App() {
     }
 
     showStatus('🚀 Démarrage de la sauvegarde...', 'info')
-    setProgress(30)
+    setProgress(5)
 
     try {
       await StartBackup(
@@ -180,8 +205,8 @@ function App() {
         config['backup-id'],
         config.usevss
       )
-      setProgress(100)
-      showStatus('✅ Sauvegarde terminée !', 'success')
+      // Backup started in background - progress will be shown via events
+      showStatus('⏳ Sauvegarde en cours...', 'info')
     } catch (err) {
       setProgress(0)
       showStatus(`❌ ${err}`, 'error')
