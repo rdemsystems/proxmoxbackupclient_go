@@ -462,7 +462,7 @@ function App() {
 
             <p style={{marginTop: '30px'}}>
               <strong>© 2026 RDEM Systems</strong><br/>
-              <a href="https://backup.rdem-systems.com" style={{color: '#667eea'}}>backup.rdem-systems.com</a>
+              <a href="https://nimbus.rdem-systems.com" style={{color: '#667eea'}}>nimbus.rdem-systems.com</a>
             </p>
 
             <p style={{marginTop: '20px', color: '#718096', fontSize: '12px'}}>

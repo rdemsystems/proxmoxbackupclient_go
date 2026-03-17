@@ -65,7 +65,7 @@ Documentation pour générer les fichiers de configuration depuis **members.rdem
   "enabled": true,
 
   "pbs_config": {
-    "baseurl": "https://backup.rdem-systems.com:8007",
+    "baseurl": "https://nimbus.rdem-systems.com:8007",
     "certfingerprint": "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
     "authid": "client@pbs!backup-token",
     "secret": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",

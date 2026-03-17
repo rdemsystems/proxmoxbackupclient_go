@@ -150,4 +150,4 @@ Si le binaire dépasse 30 MB, vérifier que `-s -w -trimpath` est bien utilisé.
 
 ## Contact
 
-RDEM Systems - https://backup.rdem-systems.com
+RDEM Systems - https://nimbus.rdem-systems.com

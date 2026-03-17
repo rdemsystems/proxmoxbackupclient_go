@@ -249,7 +249,7 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 - **GitLab Issues**: Primary communication channel
 - **Email**: contact@rdem-systems.com (for sensitive matters)
-- **Website**: https://backup.rdem-systems.com
+- **Website**: https://nimbus.rdem-systems.com
 
 ---
 

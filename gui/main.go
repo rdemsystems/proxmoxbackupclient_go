@@ -156,7 +156,7 @@ Version: %s
 Debug Log: %s
 
 Please report this issue to RDEM Systems:
-- Website: https://backup.rdem-systems.com
+- Website: https://nimbus.rdem-systems.com
 - Include this crash_report.txt file
 `, timestamp, appVersion, message, debugLogPath)
 

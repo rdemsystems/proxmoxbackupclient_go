@@ -228,7 +228,7 @@ Voir **INTEGRATION_MEMBERS.md** pour code complet :
 ## 📞 Support & Contribution
 
 - **Client Go original** : https://github.com/tizbac/proxmoxbackupclient_go
-- **Site commercial** : https://backup.rdem-systems.com
+- **Site commercial** : https://nimbus.rdem-systems.com
 - **Members portal** : https://members.rdem-systems.com
 - **Email** : contact@rdem-systems.com
 

@@ -197,7 +197,7 @@ fyne package -os darwin -icon Icon.png
 ## 📞 Support
 
 - GitHub : https://github.com/tizbac/proxmoxbackupclient_go
-- Site web : https://backup.rdem-systems.com
+- Site web : https://nimbus.rdem-systems.com
 - Email : contact@rdem-systems.com
 
 ---

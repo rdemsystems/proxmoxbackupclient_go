@@ -42,6 +42,7 @@ variables:
     - main
     - master
     - develop
+    - github-release
     - tags
 
 # ==================== TEST STAGE ====================
@@ -166,6 +167,7 @@ package:linux:
   only:
     - main
     - master
+    - github-release
     - tags
 
 package:windows:
@@ -189,6 +191,7 @@ package:windows:
   only:
     - main
     - master
+    - github-release
     - tags
 
 # ==================== PUBLISH STAGE ====================
@@ -220,4 +223,5 @@ publish:registry:
   only:
     - main
     - master
+    - github-release
     - tags
