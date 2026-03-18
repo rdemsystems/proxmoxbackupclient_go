@@ -45,9 +45,12 @@ jobs:
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
+        env:
+          GOWORK: off
         with:
           version: latest
           working-directory: gui
+          args: --verbose --print-issued-lines=true
 
   # Unit tests
   test:
