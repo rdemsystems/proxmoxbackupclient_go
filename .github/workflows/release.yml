@@ -108,6 +108,33 @@ jobs:
           Write-Host "✅ Release package created"
         shell: pwsh
 
+      - name: Generate Release Notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION="${{ github.ref_name }}"
+
+          # Extract changelog for this version
+          sed -n "/## \[${VERSION#v}\]/,/## \[/p" CHANGELOG.md | sed '$d' > RELEASE_NOTES.md
+
+          # Add header
+          sed -i '1i ## Nimbus Backup - Release '"$VERSION"'\n\nClient de sauvegarde pour Proxmox Backup Server\n\n### 📦 Installation\n\nTéléchargez `NimbusBackup.exe` et lancez-le avec les droits administrateur.\n' RELEASE_NOTES.md
+
+          # Add footer
+          echo "" >> RELEASE_NOTES.md
+          echo "### 🔧 Prérequis" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "- Windows 10/11 (64-bit)" >> RELEASE_NOTES.md
+          echo "- Droits administrateur pour VSS" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### 📝 Configuration" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "La configuration se fait via l'interface graphique au premier lancement." >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "---" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "**RDEM Systems** | [nimbus.rdem-systems.com](https://nimbus.rdem-systems.com)" >> RELEASE_NOTES.md
+        shell: bash
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -117,33 +144,4 @@ jobs:
             NimbusBackup.exe
           draft: false
           prerelease: false
-          generate_release_notes: true
-          body: |
-            ## Nimbus Backup - Release ${{ github.ref_name }}
-
-            Client de sauvegarde pour Proxmox Backup Server
-
-            ### 📦 Installation
-
-            Téléchargez `NimbusBackup.exe` et lancez-le avec les droits administrateur.
-
-            ### ✨ Nouveautés v0.4.0
-
-            - Interface Wails moderne et performante
-            - Sauvegarde de répertoires et disques complets
-            - Restauration de snapshots
-            - Support VSS Windows
-            - Logs de debug automatiques
-
-            ### 🔧 Prérequis
-
-            - Windows 10/11 (64-bit)
-            - Droits administrateur pour VSS
-
-            ### 📝 Configuration
-
-            La configuration se fait via l'interface graphique au premier lancement.
-
-            ---
-
-            **RDEM Systems** | [nimbus.rdem-systems.com](https://nimbus.rdem-systems.com)
+          body_path: RELEASE_NOTES.md
