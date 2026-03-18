@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 
 	"github.com/cornelk/hashmap"
@@ -33,6 +34,23 @@ type BackupOptions struct {
 
 var didxMagic = []byte{28, 145, 78, 165, 25, 186, 179, 205}
 
+// calculateDirSize scans a directory recursively and returns total size in bytes
+func calculateDirSize(path string) uint64 {
+	var totalSize uint64
+
+	filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+		if !info.IsDir() {
+			totalSize += uint64(info.Size())
+		}
+		return nil
+	})
+
+	return totalSize
+}
+
 type ChunkState struct {
 	assignments        []string
 	assignments_offset []uint64
@@ -47,6 +65,7 @@ type ChunkState struct {
 	knownChunks        *hashmap.Map[string, bool]
 	onProgress         func(float64, string)
 	lastProgressReport uint64
+	totalSize          *atomic.Uint64 // Total size, updated by background scan
 }
 
 type DidxEntry struct {
@@ -54,7 +73,7 @@ type DidxEntry struct {
 	digest []byte
 }
 
-func (c *ChunkState) Init(newchunk *atomic.Uint64, reusechunk *atomic.Uint64, knownChunks *hashmap.Map[string, bool], onProgress func(float64, string)) {
+func (c *ChunkState) Init(newchunk *atomic.Uint64, reusechunk *atomic.Uint64, knownChunks *hashmap.Map[string, bool], onProgress func(float64, string), totalSize *atomic.Uint64) {
 	c.assignments = make([]string, 0)
 	c.assignments_offset = make([]uint64, 0)
 	c.pos = 0
@@ -68,6 +87,7 @@ func (c *ChunkState) Init(newchunk *atomic.Uint64, reusechunk *atomic.Uint64, kn
 	c.knownChunks = knownChunks
 	c.onProgress = onProgress
 	c.lastProgressReport = 0
+	c.totalSize = totalSize
 }
 
 func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) {
@@ -104,12 +124,27 @@ func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) {
 			// Report progress every 10 MB
 			if c.onProgress != nil && c.pos-c.lastProgressReport > 10*1024*1024 {
 				c.lastProgressReport = c.pos
-				msg := fmt.Sprintf("Processed %d MB (New: %d, Reused: %d chunks)",
-					c.pos/(1024*1024), c.newchunk.Load(), c.reusechunk.Load())
-				// Progress is 10% to 90% during backup
-				progress := 0.1 + (float64(c.pos)/float64(100*1024*1024))*0.8
-				if progress > 0.9 {
-					progress = 0.9
+				sizeMB := c.pos / (1024 * 1024)
+				msg := fmt.Sprintf("Traité: %d MB (New: %d, Reused: %d chunks)",
+					sizeMB, c.newchunk.Load(), c.reusechunk.Load())
+
+				// Calculate progress based on total size if available
+				var progress float64
+				totalSize := c.totalSize.Load()
+				if totalSize > 0 {
+					// Progress from 10% to 90% based on bytes processed
+					progress = 0.1 + (float64(c.pos)/float64(totalSize))*0.8
+					if progress > 0.9 {
+						progress = 0.9
+					}
+					msg = fmt.Sprintf("Traité: %d / %d MB (New: %d, Reused: %d chunks)",
+						sizeMB, totalSize/(1024*1024), c.newchunk.Load(), c.reusechunk.Load())
+				} else {
+					// No total size yet, show indeterminate progress
+					progress = 0.1 + float64(sizeMB%100)/1000.0 // Slowly increment from 10%
+					if progress > 0.5 {
+						progress = 0.5
+					}
 				}
 				c.onProgress(progress, msg)
 			}
@@ -289,6 +324,15 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 	client.Connect(false, "host")
 	knownChunks := hashmap.New[string, bool]()
 
+	// Start background scan to calculate total size
+	totalSize := &atomic.Uint64{}
+	go func() {
+		writeDebugLog(fmt.Sprintf("Starting background size calculation for: %s", backupdir))
+		size := calculateDirSize(backupdir)
+		totalSize.Store(size)
+		writeDebugLog(fmt.Sprintf("Total size calculated: %d MB", size/(1024*1024)))
+	}()
+
 	archive := &pbscommon.PXARArchive{}
 	archive.ArchiveName = "backup.pxar.didx"
 
@@ -315,10 +359,10 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 	writeDebugLog(fmt.Sprintf("Known chunks: %d", knownChunks.Len()))
 
 	pxarChunk := ChunkState{}
-	pxarChunk.Init(newchunk, reusechunk, knownChunks, progress)
+	pxarChunk.Init(newchunk, reusechunk, knownChunks, progress, totalSize)
 
 	pcat1Chunk := ChunkState{}
-	pcat1Chunk.Init(newchunk, reusechunk, knownChunks, nil)
+	pcat1Chunk.Init(newchunk, reusechunk, knownChunks, nil, totalSize)
 
 	pxarChunk.wrid, err = client.CreateDynamicIndex(archive.ArchiveName)
 	if err != nil {
