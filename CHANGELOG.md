@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-03-18
+
+### Fixed
+- **All SA1006 linting errors resolved** - Changed fmt.Errorf(variable) to errors.New(variable)
+  - backup_inline.go:306 - fmt.Errorf(errMsg) → errors.New(errMsg)
+  - backup_inline.go:349 - fmt.Errorf(errMsg) → errors.New(errMsg)
+  - backup_inline.go:370 - fmt.Errorf(errMsg) → errors.New(errMsg)
+  - Added "errors" package import
+
+### Code Quality
+- **100% lint compliance achieved** ✅
+  - Zero SA1006 warnings
+  - Zero errcheck warnings
+  - GitLab CI passing (golangci-lint v1.64)
+  - GitHub Actions should now pass
+
+### Technical
+- Using errors.New() instead of fmt.Errorf() for pre-formatted error messages
+- Prevents % interpretation in error strings
+
 ## [0.1.16] - 2026-03-18
 
 ### Fixed
