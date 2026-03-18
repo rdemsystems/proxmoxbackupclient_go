@@ -555,20 +555,28 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 				q.Add("backup-id", pbs.Manifest.BackupID)
 				fmt.Println(q.Encode())
 				//q.Add("debug", "1")
-				if !reader {
-					conn.Write([]byte("GET /api2/json/backup?" + q.Encode() + " HTTP/1.1\r\n"))
-				} else {
-					conn.Write([]byte("GET /api2/json/reader?" + q.Encode() + " HTTP/1.1\r\n"))
-				}
 
-				conn.Write([]byte("Host: " + addr + "\r\n"))
-				conn.Write([]byte("Authorization: " + fmt.Sprintf("PBSAPIToken=%s:%s", pbs.AuthID, pbs.Secret) + "\r\n"))
+				// Build and log the full HTTP request
+				var requestLines []string
 				if !reader {
-					conn.Write([]byte("Upgrade: proxmox-backup-protocol-v1\r\n"))
+					requestLines = append(requestLines, "GET /api2/json/backup?"+q.Encode()+" HTTP/1.1")
 				} else {
-					conn.Write([]byte("Upgrade: proxmox-backup-reader-protocol-v1\r\n"))
+					requestLines = append(requestLines, "GET /api2/json/reader?"+q.Encode()+" HTTP/1.1")
 				}
-				conn.Write([]byte("Connection: Upgrade\r\n\r\n"))
+				requestLines = append(requestLines, "Host: "+addr)
+				requestLines = append(requestLines, "Authorization: "+fmt.Sprintf("PBSAPIToken=%s:%s", pbs.AuthID, pbs.Secret))
+				if !reader {
+					requestLines = append(requestLines, "Upgrade: proxmox-backup-protocol-v1")
+				} else {
+					requestLines = append(requestLines, "Upgrade: proxmox-backup-reader-protocol-v1")
+				}
+				requestLines = append(requestLines, "Connection: Upgrade")
+
+				fullRequest := strings.Join(requestLines, "\r\n") + "\r\n\r\n"
+				fmt.Printf("=== SENDING HTTP REQUEST TO PBS ===\n%s=== END REQUEST ===\n", fullRequest)
+
+				// Send the request
+				conn.Write([]byte(fullRequest))
 				fmt.Print("Reading response to upgrade...\n")
 				buf := make([]byte, 0)
 				for !strings.HasSuffix(string(buf), "\r\n\r\n") && !strings.HasSuffix(string(buf), "\n\n") {
@@ -583,12 +591,16 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 
 					//fmt.Println(string(b2))
 				}
+				fmt.Printf("=== RECEIVED HTTP RESPONSE FROM PBS ===\n%s\n=== END RESPONSE ===\n", string(buf))
+
 				lines := strings.Split(string(buf), "\n")
 
 				if len(lines) > 0 {
 					toks := strings.Split(lines[0], " ")
 					if len(toks) > 1 && toks[1] != "101" {
 						statusCode := strings.Join(toks[1:], " ")
+						fmt.Printf("ERROR: PBS rejected upgrade with status: %s\n", statusCode)
+						fmt.Printf("Full response body:\n%s\n", string(buf))
 						return nil, &AuthErr{
 							StatusCode:   statusCode,
 							ResponseBody: string(buf),

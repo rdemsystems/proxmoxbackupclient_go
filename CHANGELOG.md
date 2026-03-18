@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-03-18
+
+### Added
+- **Comprehensive debug logging for PBS HTTP/2 upgrade**
+  - Logs full HTTP request sent to PBS (all headers)
+  - Logs full HTTP response received from PBS
+  - Shows exact request/response for debugging 400 errors
+  - Will reveal what PBS is rejecting in the upgrade request
+
+### Debugging
+- Request and response now logged with clear delimiters
+- Should show exactly what's different between v0.0.23 and v0.1.x
+- Check debug log for "=== SENDING HTTP REQUEST TO PBS ===" sections
+
 ## [0.1.21] - 2026-03-18
 
 ### Fixed
