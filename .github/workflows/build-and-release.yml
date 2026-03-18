@@ -43,14 +43,16 @@ jobs:
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           cd gui && gosec -severity high -confidence high ./...
 
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        working-directory: gui
         env:
           GOWORK: off
-        with:
-          version: latest
-          working-directory: gui
-          args: --verbose --print-issued-lines=true --max-issues-per-linter=0 --max-same-issues=0
+        run: golangci-lint run -v --timeout=5m
 
   # Unit tests
   test:
