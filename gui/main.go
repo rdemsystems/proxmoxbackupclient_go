@@ -80,6 +80,8 @@ func init() {
 		logDir = "."
 	}
 
+	// #nosec G703 -- Path is validated with security.ValidatePath() to prevent traversal
+	// This is a legitimate use case: creating app log directory in user's home/appdata
 	_ = os.MkdirAll(logDir, 0700)
 	debugLogPath = filepath.Join(logDir, "debug.log")
 
