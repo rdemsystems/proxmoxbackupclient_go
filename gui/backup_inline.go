@@ -367,7 +367,7 @@ func RunBackupInline(opts BackupOptions) error {
 		if opts.OnComplete != nil {
 			opts.OnComplete(false, errMsg)
 		}
-		return errors.New(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	progress(1.0, "Backup completed")
