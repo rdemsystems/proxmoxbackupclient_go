@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-03-18
+
+### Security
+- **gosec G703 suppression** - Added justified nosec annotation
+  - Path validated with security.ValidatePath() before use
+  - Static analysis limitation: can't detect runtime validation
+  - Clear documentation of security measures taken
+  - Zero unaddressed security issues
+
+### Documentation
+- Improved security annotation comments for audit trail
+
 ## [0.1.7] - 2026-03-18
 
 ### Security
