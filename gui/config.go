@@ -19,9 +19,10 @@ type Config struct {
 	Namespace       string `json:"namespace"`
 
 	// Backup Settings
-	BackupDir string `json:"backupdir"`
-	BackupID  string `json:"backup-id"`
-	UseVSS    bool   `json:"usevss"`
+	BackupDir      string   `json:"backupdir"`
+	BackupID       string   `json:"backup-id"`
+	UseVSS         bool     `json:"usevss"`
+	LastBackupDirs []string `json:"last_backup_dirs,omitempty"` // Remember last used directories
 
 	// Email Notifications (optional)
 	SMTPHost     string `json:"smtp_host,omitempty"`

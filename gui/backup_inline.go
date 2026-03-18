@@ -56,20 +56,21 @@ func calculateDirSize(path string) uint64 {
 }
 
 type ChunkState struct {
-	assignments        []string
-	assignments_offset []uint64
-	pos                uint64
-	wrid               uint64
-	chunkcount         uint64
-	chunkdigests       hash.Hash
-	current_chunk      []byte
-	C                  pbscommon.Chunker
-	newchunk           *atomic.Uint64
-	reusechunk         *atomic.Uint64
-	knownChunks        *hashmap.Map[string, bool]
-	onProgress         func(float64, string)
-	lastProgressReport uint64
-	totalSize          *atomic.Uint64 // Total size, updated by background scan
+	assignments         []string
+	assignments_offset  []uint64
+	pos                 uint64
+	wrid                uint64
+	chunkcount          uint64
+	chunkdigests        hash.Hash
+	current_chunk       []byte
+	C                   pbscommon.Chunker
+	newchunk            *atomic.Uint64
+	reusechunk          *atomic.Uint64
+	knownChunks         *hashmap.Map[string, bool]
+	onProgress          func(float64, string)
+	lastProgressReport  uint64
+	lastProgressPercent float64            // Track last reported percentage to prevent backwards progress
+	totalSize           *atomic.Uint64     // Total size, updated by background scan
 }
 
 type DidxEntry struct {
@@ -91,6 +92,7 @@ func (c *ChunkState) Init(newchunk *atomic.Uint64, reusechunk *atomic.Uint64, kn
 	c.knownChunks = knownChunks
 	c.onProgress = onProgress
 	c.lastProgressReport = 0
+	c.lastProgressPercent = 0.0
 	c.totalSize = totalSize
 }
 
@@ -169,6 +171,13 @@ func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) error {
 						progress = 0.5
 					}
 				}
+
+				// Never report backwards progress - totalSize can increase during backup
+				if progress < c.lastProgressPercent {
+					progress = c.lastProgressPercent
+				}
+				c.lastProgressPercent = progress
+
 				c.onProgress(progress, msg)
 			}
 
@@ -336,8 +345,8 @@ func RunBackupInline(opts BackupOptions) error {
 	var reusechunk atomic.Uint64
 
 	for idx, dir := range opts.BackupDirs {
-		dirProgress := float64(idx) / float64(len(opts.BackupDirs))
-		progress(0.1+dirProgress*0.8, fmt.Sprintf("Backing up %s...", dir))
+		// Log directory start but don't call progress() to avoid interfering with ChunkState progress
+		writeDebugLog(fmt.Sprintf("Starting backup of directory %d/%d: %s", idx+1, len(opts.BackupDirs), dir))
 
 		err := backupDirectory(client, &newchunk, &reusechunk, dir, opts.UseVSS, progress)
 		if err != nil {

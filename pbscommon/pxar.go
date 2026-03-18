@@ -247,7 +247,6 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) (Cata
 	if err != nil {
 		// Log stat errors but continue backup - don't fail on inaccessible directories
 		skipMsg := fmt.Sprintf("Cannot stat directory: %s (Error: %v)", path, err)
-		fmt.Printf("Warning: %s\n", skipMsg)
 		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogDir{}, nil
 	}
@@ -255,7 +254,6 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) (Cata
 	// Skip directory junction points to avoid infinite loops and access errors
 	if !toplevel && fileInfo.Mode()&os.ModeSymlink != 0 {
 		skipMsg := fmt.Sprintf("Junction point (skipped): %s", path)
-		fmt.Printf("%s\n", skipMsg)
 		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogDir{}, nil // Return nil error to continue backup
 	}
@@ -264,7 +262,6 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) (Cata
 	if err != nil {
 		// Log read errors but continue backup - don't fail on permission denied, locked files, etc.
 		skipMsg := fmt.Sprintf("Cannot read directory: %s (Error: %v)", path, err)
-		fmt.Printf("Warning: %s\n", skipMsg)
 		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogDir{}, nil
 	}
@@ -464,7 +461,6 @@ func (a *PXARArchive) WriteFile(path string, basename string) (CatalogFile, erro
 	if err != nil {
 		// Log stat errors but continue backup - don't fail on inaccessible files
 		skipMsg := fmt.Sprintf("Cannot stat file: %s (Error: %v)", path, err)
-		fmt.Printf("Warning: %s\n", skipMsg)
 		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogFile{}, nil
 	}
@@ -472,7 +468,6 @@ func (a *PXARArchive) WriteFile(path string, basename string) (CatalogFile, erro
 	// Skip junction points and symlinks (common on Windows: "Application Data", etc.)
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
 		skipMsg := fmt.Sprintf("Junction point (skipped): %s", path)
-		fmt.Printf("%s\n", skipMsg)
 		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogFile{}, nil // Return nil error to continue backup
 	}
@@ -482,7 +477,6 @@ func (a *PXARArchive) WriteFile(path string, basename string) (CatalogFile, erro
 	if err != nil {
 		// Log file open errors but continue backup - don't fail on locked/system files
 		skipMsg := fmt.Sprintf("Cannot open file: %s (Error: %v)", path, err)
-		fmt.Printf("Warning: %s\n", skipMsg)
 		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogFile{}, nil
 	}

@@ -347,6 +347,12 @@ func (a *App) TestConnection() error {
 	return nil
 }
 
+// GetLastBackupDirs returns the last used backup directories
+func (a *App) GetLastBackupDirs() []string {
+	writeDebugLog(fmt.Sprintf("GetLastBackupDirs() returned %d directories", len(a.config.LastBackupDirs)))
+	return a.config.LastBackupDirs
+}
+
 // StartBackup starts a backup operation
 func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
 	// Sanitize backup ID for logging
@@ -423,6 +429,16 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 				"success": success,
 				"message": message,
 			})
+
+			// Save last used backup directories on success
+			if success && backupType == "directory" {
+				a.config.LastBackupDirs = backupDirs
+				if err := a.config.Save(); err != nil {
+					writeDebugLog(fmt.Sprintf("Failed to save last backup dirs: %v", err))
+				} else {
+					writeDebugLog(fmt.Sprintf("Saved %d backup directories to config", len(backupDirs)))
+				}
+			}
 		},
 	}
 
