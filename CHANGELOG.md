@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-03-18
+
+### Fixed
+- **CI/CD workflow improvements**
+  - Added GOWORK=off to golangci-lint step to prevent workspace-wide linting
+  - Fixed hardcoded v0.4.0 in release notes (now uses dynamic version from tag)
+  - Added verbose output and line numbers for better error reporting
+  - Workflow now extracts changelog content automatically
+
+### Documentation
+- Updated README to focus on Nimbus Backup with RDEM Systems branding
+- Properly credited original project (tizbac/proxmoxbackupclient_go)
+- Removed detailed CLI documentation from fork
+- Cleaner structure for Windows GUI users
+
 ## [0.1.11] - 2026-03-18
 
 ### Fixed
