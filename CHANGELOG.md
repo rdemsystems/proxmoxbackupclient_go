@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-03-18
+
+### Security
+- **Path traversal prevention** - Fixed gosec G703 high severity
+  - Added ValidatePath() check before log directory creation
+  - Validates paths from environment variables (APPDATA/HOME)
+  - Fallback to safe directory if validation fails
+  - All gosec security checks now passing
+
+### CI/CD
+- GitHub Actions security job fully operational
+- Zero high/medium security issues
+
 ## [0.1.6] - 2026-03-18
 
 ### Fixed
