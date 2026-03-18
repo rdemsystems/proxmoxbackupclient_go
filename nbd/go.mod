@@ -2,6 +2,8 @@ module pbsnbd
 
 go 1.22
 
+require pbscommon v0.0.0
+
 require (
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/gdamore/tcell/v2 v2.8.1 // indirect
@@ -14,3 +16,6 @@ require (
 	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 )
+
+// Local package replacements
+replace pbscommon => ../pbscommon

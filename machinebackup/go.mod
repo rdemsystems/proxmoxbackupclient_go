@@ -3,10 +3,23 @@ module machinebackup
 go 1.22
 
 require (
+	clientcommon v0.0.0
+	pbscommon v0.0.0
+	snapshot v0.0.0
+)
+
+require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 // indirect
+)
+
+// Local package replacements
+replace (
+	clientcommon => ../clientcommon
+	pbscommon => ../pbscommon
+	snapshot => ../snapshot
 )
