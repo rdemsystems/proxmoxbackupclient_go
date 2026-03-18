@@ -112,7 +112,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to open log file: %v\n", err)
 	} else {
-		defer logFile.Close()
+		defer func() { _ = logFile.Close() }()
 		// Log to both file and stderr
 		log.SetOutput(io.MultiWriter(logFile, os.Stderr))
 	}
@@ -179,7 +179,7 @@ func writeDebugLog(message string) {
 		fmt.Fprintf(os.Stderr, "Failed to write debug log: %v\n", err)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, _ = f.WriteString(logLine)
 
 	// Also write to stderr for console visibility

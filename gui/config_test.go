@@ -78,10 +78,10 @@ func TestConfigSaveLoad(t *testing.T) {
 	// Create temp directory for test
 	tmpDir := t.TempDir()
 	oldHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", oldHome)
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 	// Set temp HOME for test
-	os.Setenv("HOME", tmpDir)
+	_ = os.Setenv("HOME", tmpDir)
 
 	config := &Config{
 		BaseURL:   "https://pbs.example.com:8007",
@@ -123,9 +123,9 @@ func TestConfigSaveLoad(t *testing.T) {
 func TestGetConfigPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", oldHome)
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
-	os.Setenv("HOME", tmpDir)
+	_ = os.Setenv("HOME", tmpDir)
 
 	configPath, err := getConfigPath()
 	if err != nil {
