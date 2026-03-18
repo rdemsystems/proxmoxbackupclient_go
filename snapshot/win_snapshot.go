@@ -71,7 +71,7 @@ func CreateVSSSnapshot(paths []string, backup_callback func(sn map[string]SnapSh
 
 		defer sn.Release()
 
-		fmt.Printf("Creating VSS Snapshot...")
+		fmt.Print("Creating VSS Snapshot...")
 		snapshot, err := sn.CreateSnapshot(volName, false, 180)
 		if err != nil {
 			return err
