@@ -269,14 +269,13 @@ func (pbs *PBSClient) CreateDynamicIndex(name string) (uint64, error) {
 
 	resp2, err := pbs.Client.Do(req)
 	if err != nil {
-		fmt.Println("Error making request:", err)
-		return 0, err
+		return 0, fmt.Errorf("HTTP request failed: %w", err)
 	}
+	defer resp2.Body.Close()
 
 	if resp2.StatusCode != http.StatusOK {
-		resp1, err := io.ReadAll(resp2.Body)
-		fmt.Println("Error making request:", string(resp1), string(resp2.Proto))
-		return 0, err
+		bodyBytes, _ := io.ReadAll(resp2.Body)
+		return 0, fmt.Errorf("PBS returned HTTP %d: %s", resp2.StatusCode, string(bodyBytes))
 	}
 
 	resp1, err := io.ReadAll(resp2.Body)
