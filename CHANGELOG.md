@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-03-18
+
+### Fixed
+- **Final Printf linting issues** - Fixed remaining SA1006 warnings in machinebackup
+  - machinebackup/windows.go:452: log.Printf → log.Print
+  - machinebackup/windows.go:462: log.Printf → log.Print
+  - Workspace-wide linting now fully clean
+
+### Code Quality
+- Zero linting warnings across all workspace modules
+- 100% golangci-lint compliance (gui + workspace modules)
+
 ## [0.1.10] - 2026-03-18
 
 ### Fixed

@@ -449,7 +449,7 @@ func backupWindowsDisk(client *pbscommon.PBSClient, index int) (int64, error) {
 					}
 
 					if uint64(P.EndByte) != uint64(P.StartByte)+uint64(l) {
-						log.Printf("Harmless warning: VSS snapshot is smaller than partition ( probably FS is too ), will pad with zeros")
+						log.Print("Harmless warning: VSS snapshot is smaller than partition ( probably FS is too ), will pad with zeros")
 					}
 
 					npad := P.EndByte - (uint64(P.StartByte) + uint64(l))
@@ -459,7 +459,7 @@ func backupWindowsDisk(client *pbscommon.PBSClient, index int) (int64, error) {
 						nbytes, err := snapshot_file.Read(block)
 						if err == io.EOF {
 							if pos != P.EndByte {
-								log.Printf("Harmless warning: VSS snapshot is smaller than partition ( probably FS is too ), will pad with zeros")
+								log.Print("Harmless warning: VSS snapshot is smaller than partition ( probably FS is too ), will pad with zeros")
 								npad = P.EndByte - pos
 								break
 							}
