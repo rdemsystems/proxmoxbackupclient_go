@@ -16,6 +16,7 @@ import (
 	"github.com/cornelk/hashmap"
 	"pbscommon"
 	"pkg/retry"
+	"pkg/security"
 	"snapshot"
 )
 
@@ -308,13 +309,13 @@ func RunBackupInline(opts BackupOptions) error {
 
 	progress(0.05, "Connecting to PBS...")
 
-	// Debug: log connection parameters (mask secret)
-	maskedSecret := "***"
-	if len(opts.Secret) > 4 {
-		maskedSecret = opts.Secret[:4] + "..." + opts.Secret[len(opts.Secret)-4:]
-	}
+	// Debug: log connection parameters with sanitized credentials
 	writeDebugLog(fmt.Sprintf("PBS Connection: URL=%s, AuthID=%s, Secret=%s, Datastore=%s, BackupID=%s",
-		opts.BaseURL, opts.AuthID, maskedSecret, opts.Datastore, opts.BackupID))
+		security.SanitizeURL(opts.BaseURL),
+		opts.AuthID,
+		security.SanitizeSecret(opts.Secret),
+		opts.Datastore,
+		opts.BackupID))
 
 	// Create PBS client
 	client := &pbscommon.PBSClient{

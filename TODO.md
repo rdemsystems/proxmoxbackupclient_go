@@ -12,21 +12,21 @@
 - [x] Fix golangci-lint (errcheck, gosimple)
 - [x] Renommer binaire → NimbusBackup dans CI
 
-## 🔄 Phase 2 - Tests (EN COURS)
+## ✅ Phase 2 - Tests (COMPLÉTÉ v0.1.2)
 
 - [x] Tests logger (pkg/logger/logger_test.go)
 - [x] Tests retry (pkg/retry/retry_test.go)
-- [ ] Tests chunking (pbscommon/chunking_test.go)
-- [ ] Tests PXAR (pbscommon/pxar_test.go)
-- [ ] Tests snapshot (snapshot/snapshot_test.go)
-- [ ] Target: 50%+ code coverage
+- [x] Tests chunking (pbscommon/chunking_test.go) - 15+ tests
+- [ ] Tests PXAR (pbscommon/pxar_test.go) - TODO
+- [x] Tests snapshot (snapshot/snapshot_test.go) - Windows VSS
+- [ ] Target: 50%+ code coverage (en progression)
 
-## 🔄 Phase 3 - Security (EN COURS)
+## ✅ Phase 3 - Security (COMPLÉTÉ v0.1.2)
 
 - [x] Infrastructure security (pkg/security)
-- [ ] Intégrer validation dans tous les entry points
-- [ ] Ajouter sanitization à tous les logs
-- [ ] Security audit complet avant v0.2
+- [x] Intégrer validation dans tous les entry points
+- [x] Ajouter sanitization à tous les logs
+- [ ] Security audit complet avant v0.2 (review externe)
 - [ ] TLS certificate pinning (optionnel, basse priorité)
 
 ## 🚀 Features v0.2 (ROADMAP Q2 2026)

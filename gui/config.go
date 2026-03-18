@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"pkg/security"
 )
 
 type Config struct {
@@ -82,17 +84,55 @@ func (c *Config) Save() error {
 }
 
 func (c *Config) Validate() error {
+	// Validate BaseURL
 	if c.BaseURL == "" {
 		return fmt.Errorf("URL du serveur PBS requis")
 	}
+	if err := security.ValidateURL(c.BaseURL); err != nil {
+		return fmt.Errorf("URL invalide: %w", err)
+	}
+
+	// Validate AuthID
 	if c.AuthID == "" {
 		return fmt.Errorf("Authentication ID requis")
 	}
+	if err := security.ValidateAuthID(c.AuthID); err != nil {
+		return fmt.Errorf("Authentication ID invalide: %w", err)
+	}
+
+	// Validate Secret (non-empty check)
 	if c.Secret == "" {
 		return fmt.Errorf("Secret requis")
 	}
+
+	// Validate Datastore
 	if c.Datastore == "" {
 		return fmt.Errorf("Datastore requis")
 	}
+	if err := security.ValidateDatastore(c.Datastore); err != nil {
+		return fmt.Errorf("Datastore invalide: %w", err)
+	}
+
+	// Validate BackupID if present
+	if c.BackupID != "" {
+		if err := security.ValidateBackupID(c.BackupID); err != nil {
+			return fmt.Errorf("Backup ID invalide: %w", err)
+		}
+	}
+
+	// Validate Certificate Fingerprint if present
+	if c.CertFingerprint != "" {
+		if err := security.ValidateFingerprint(c.CertFingerprint); err != nil {
+			return fmt.Errorf("Empreinte certificat invalide: %w", err)
+		}
+	}
+
+	// Validate BackupDir if present
+	if c.BackupDir != "" {
+		if err := security.ValidatePath(c.BackupDir); err != nil {
+			return fmt.Errorf("Chemin de backup invalide: %w", err)
+		}
+	}
+
 	return nil
 }

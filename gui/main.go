@@ -18,6 +18,7 @@ import (
 	wailswin "github.com/wailsapp/wails/v2/pkg/options/windows"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"pbscommon"
+	"pkg/security"
 )
 
 //go:embed all:frontend/dist
@@ -297,7 +298,19 @@ func (a *App) GetConfigWithHostname() map[string]interface{} {
 
 // SaveConfig saves the configuration
 func (a *App) SaveConfig(config *Config) error {
-	writeDebugLog(fmt.Sprintf("SaveConfig() called: %+v", config))
+	// Log sanitized config (no secrets)
+	writeDebugLog(fmt.Sprintf("SaveConfig() called: URL=%s, AuthID=%s, Datastore=%s, BackupID=%s",
+		security.SanitizeURL(config.BaseURL),
+		config.AuthID,
+		config.Datastore,
+		config.BackupID))
+
+	// Validate before saving
+	if err := config.Validate(); err != nil {
+		writeDebugLog(fmt.Sprintf("Config validation failed: %v", err))
+		return err
+	}
+
 	a.config = config
 	return config.Save()
 }
@@ -325,13 +338,12 @@ func (a *App) TestConnection() error {
 		},
 	}
 
-	// Debug log (mask secret)
-	maskedSecret := "***"
-	if len(a.config.Secret) > 4 {
-		maskedSecret = a.config.Secret[:4] + "..." + a.config.Secret[len(a.config.Secret)-4:]
-	}
+	// Debug log with sanitized credentials
 	writeDebugLog(fmt.Sprintf("Testing connection: URL=%s, AuthID=%s, Secret=%s, Datastore=%s",
-		a.config.BaseURL, a.config.AuthID, maskedSecret, a.config.Datastore))
+		security.SanitizeURL(a.config.BaseURL),
+		a.config.AuthID,
+		security.SanitizeSecret(a.config.Secret),
+		a.config.Datastore))
 
 	// Try to connect in backup mode (not reader) to test with Datastore.Backup permission
 	client.Connect(false, "host")
@@ -344,8 +356,28 @@ func (a *App) TestConnection() error {
 
 // StartBackup starts a backup operation
 func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
-	writeDebugLog(fmt.Sprintf("StartBackup() called: type=%s, dirs=%v, drives=%v, id=%s, vss=%v",
-		backupType, backupDirs, driveLetters, backupID, useVSS))
+	// Sanitize backup ID for logging
+	sanitizedID := backupID
+	if backupID != "" {
+		sanitizedID = security.SanitizeForLog(backupID)
+	}
+	writeDebugLog(fmt.Sprintf("StartBackup() called: type=%s, id=%s, vss=%v, dir_count=%d",
+		backupType, sanitizedID, useVSS, len(backupDirs)))
+
+	// Validate BackupID
+	if backupID == "" {
+		return fmt.Errorf("Backup ID requis")
+	}
+	if err := security.ValidateBackupID(backupID); err != nil {
+		return fmt.Errorf("Backup ID invalide: %w", err)
+	}
+
+	// Validate backup directories
+	for _, dir := range backupDirs {
+		if err := security.ValidatePath(dir); err != nil {
+			return fmt.Errorf("Chemin invalide '%s': %w", dir, err)
+		}
+	}
 
 	// Check admin privileges if VSS is requested
 	if useVSS && !isAdmin() {
