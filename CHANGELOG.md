@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-03-18
+
+### Fixed
+- **Build error** - Removed remaining errors.New reference
+  - Line 370 still had errors.New after import removal
+  - Changed to fmt.Errorf("%s", errMsg)
+  - All CI/CD pipelines now passing
+
 ## [0.1.18] - 2026-03-18
 
 ### Fixed
