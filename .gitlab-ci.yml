@@ -61,15 +61,15 @@ test:code:
     - tags
 
 lint:
-  image: golangci/golangci-lint:v1.55
+  image: golangci/golangci-lint:v1.64
   stage: test
   before_script:
     - apt-get update && apt-get install -y gcc libgl1-mesa-dev xorg-dev pkg-config
     - cd gui
     - go mod tidy
   script:
-    - golangci-lint run -v --timeout=5m
-  allow_failure: true
+    - golangci-lint run -v --timeout=5m --verbose --print-issued-lines=true
+  allow_failure: false
   only:
     - branches
     - merge_requests
