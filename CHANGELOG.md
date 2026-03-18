@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-03-18
+
+### Fixed
+- **Module resolution** - Fixed Go module imports for CI/CD
+  - Created go.mod files for all pkg modules (logger, retry, security)
+  - Simplified module names (pkg/retry → retry, pkg/security → security)
+  - Fixed test file imports to use local module names
+  - Fixed go.work Go version from 1.24.4 to 1.22
+  - All modules now follow consistent pattern with replace directives
+
+### Technical
+- GitHub Actions and GitLab CI now pass successfully
+- `go mod tidy` works correctly with local pkg modules
+- No more "module not found" errors in CI
+
 ## [0.1.2] - 2026-03-18
 
 ### Added
