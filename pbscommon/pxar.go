@@ -138,7 +138,7 @@ func ca_make_bst(input []GoodByeItem, output *[]GoodByeItem) {
 	make_bst_inner(input, n, log_of_2(n)+1, output, 0)
 }
 
-type PXAROutCB func([]byte)
+type PXAROutCB func([]byte) error
 
 type PXARArchive struct {
 	//Create(filename string, WriteCB PXAROutCB)
@@ -157,7 +157,7 @@ type PXARArchive struct {
 //WriteCB for pxar stream will be called.
 //It is useful when we building a data structure and we need to keep a specific offset and output it only at the end
 
-func (a *PXARArchive) Flush() {
+func (a *PXARArchive) Flush() error {
 
 	b := make([]byte, 64*1024)
 	for {
@@ -165,10 +165,13 @@ func (a *PXARArchive) Flush() {
 		if count <= 0 {
 			break
 		}
-		a.WriteCB(b[:count])
+		if err := a.WriteCB(b[:count]); err != nil {
+			return fmt.Errorf("failed to write PXAR data: %w", err)
+		}
 		a.pos = a.pos + uint64(count)
 	}
 	//fmt.Printf("Flush %d bytes\n", count)
+	return nil
 }
 
 func (a *PXARArchive) Create() {
@@ -235,17 +238,16 @@ func append_u64_7bit(a []byte, v uint64) []byte {
 
 */
 
-func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) CatalogDir {
+func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) (CatalogDir, error) {
 	//fmt.Printf("Write dir %s at %d\n", path, a.pos)
 	files, err := os.ReadDir(path)
 	if err != nil {
-		return CatalogDir{}
+		return CatalogDir{}, fmt.Errorf("failed to read directory %s: %w", path, err)
 	}
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("Failed to stat %s\n", path)
-		return CatalogDir{}
+		return CatalogDir{}, fmt.Errorf("failed to stat %s: %w", path, err)
 	}
 
 	//Avoid writing filename entry on root
@@ -261,12 +263,16 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 		a.buffer.WriteByte(0x00)
 	} else {
 		if a.CatalogWriteCB != nil {
-			a.CatalogWriteCB(catalog_magic)
+			if err := a.CatalogWriteCB(catalog_magic); err != nil {
+				return CatalogDir{}, fmt.Errorf("failed to write catalog magic: %w", err)
+			}
 			a.catalog_pos = 8
 		}
 	}
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogDir{}, err
+	}
 
 	dir_start_pos := a.pos
 
@@ -285,7 +291,9 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 	}
 	binary.Write(&a.buffer, binary.LittleEndian, entry)
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogDir{}, err
+	}
 
 	goodbyteitems := make([]GoodByeItem, 0)
 	catalog_files := make([]CatalogFile, 0)
@@ -295,7 +303,10 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 		startpos := a.pos
 		if file.IsDir() {
 
-			D := a.WriteDir(filepath.Join(path, file.Name()), file.Name(), false)
+			D, err := a.WriteDir(filepath.Join(path, file.Name()), file.Name(), false)
+			if err != nil {
+				return CatalogDir{}, err
+			}
 			catalog_dirs = append(catalog_dirs, D)
 			goodbyteitems = append(goodbyteitems, GoodByeItem{
 				offset: startpos,
@@ -303,7 +314,10 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 				len:    a.pos - startpos,
 			})
 		} else {
-			F := a.WriteFile(filepath.Join(path, file.Name()), file.Name())
+			F, err := a.WriteFile(filepath.Join(path, file.Name()), file.Name())
+			if err != nil {
+				return CatalogDir{}, err
+			}
 
 			catalog_files = append(catalog_files, F)
 			goodbyteitems = append(goodbyteitems, GoodByeItem{
@@ -339,13 +353,17 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 	catalog_outdata = append(catalog_outdata, tabledata...)
 
 	if a.CatalogWriteCB != nil {
-		a.CatalogWriteCB(catalog_outdata)
+		if err := a.CatalogWriteCB(catalog_outdata); err != nil {
+			return CatalogDir{}, fmt.Errorf("failed to write catalog data: %w", err)
+		}
 
 	}
 
 	a.catalog_pos += uint64(len(catalog_outdata))
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogDir{}, err
+	}
 
 	//Sort goodbyeitems by sip hash to build later kinda of heap
 
@@ -361,7 +379,9 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 
 	goodbyteitems = goodbyteitemsnew
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogDir{}, err
+	}
 	goodbye_start := a.pos
 
 	binary.Write(&a.buffer, binary.LittleEndian, PXAR_GOODBYE)
@@ -381,7 +401,9 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 
 	binary.Write(&a.buffer, binary.LittleEndian, gi)
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogDir{}, err
+	}
 
 	if toplevel {
 		//We write special pointer to root dir here
@@ -398,32 +420,34 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) Catal
 		ptr := make([]byte, 0)
 		ptr = binary.LittleEndian.AppendUint64(ptr, a.catalog_pos)
 		if a.CatalogWriteCB != nil {
-			a.CatalogWriteCB(catalog_outdata)
-			a.CatalogWriteCB(ptr)
+			if err := a.CatalogWriteCB(catalog_outdata); err != nil {
+				return CatalogDir{}, fmt.Errorf("failed to write catalog toplevel data: %w", err)
+			}
+			if err := a.CatalogWriteCB(ptr); err != nil {
+				return CatalogDir{}, fmt.Errorf("failed to write catalog pointer: %w", err)
+			}
 		}
 	}
 
 	return CatalogDir{
 		Name: dirname,
 		Pos:  oldpos,
-	}
+	}, nil
 }
 
 // On pxar first item and consquently entry point must always be WriteDir , because toplevel is always a directory
 // So backing up single file is not possible
-func (a *PXARArchive) WriteFile(path string, basename string) CatalogFile {
+func (a *PXARArchive) WriteFile(path string, basename string) (CatalogFile, error) {
 	//fmt.Printf("Write file %s at %d\n", path, a.pos)
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("Failed to stat %s\n", path)
-		return CatalogFile{}
+		return CatalogFile{}, fmt.Errorf("failed to stat %s: %w", path, err)
 	}
 
 	file, err := os.Open(path)
 
 	if err != nil {
-		fmt.Printf("Failed to open %s\n", path)
-		return CatalogFile{}
+		return CatalogFile{}, fmt.Errorf("failed to open %s: %w", path, err)
 	}
 
 	defer file.Close()
@@ -457,7 +481,9 @@ func (a *PXARArchive) WriteFile(path string, basename string) CatalogFile {
 	filesize := uint64(fileInfo.Size()) + 16 //File size + header size
 	binary.Write(&a.buffer, binary.LittleEndian, filesize)
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogFile{}, err
+	}
 
 	readbuffer := make([]byte, 1024*64)
 
@@ -467,17 +493,21 @@ func (a *PXARArchive) WriteFile(path string, basename string) CatalogFile {
 			break
 		}
 		if err != nil {
-			panic(err.Error())
+			return CatalogFile{}, fmt.Errorf("failed to read from %s: %w", path, err)
 		}
 		a.buffer.Write(readbuffer[:nread])
-		a.Flush()
+		if err := a.Flush(); err != nil {
+			return CatalogFile{}, err
+		}
 	}
 
-	a.Flush()
+	if err := a.Flush(); err != nil {
+		return CatalogFile{}, err
+	}
 
 	return CatalogFile{
 		Name:  basename,
 		MTime: uint64(fileInfo.ModTime().Unix()),
 		Size:  uint64(fileInfo.Size()),
-	}
+	}, nil
 }

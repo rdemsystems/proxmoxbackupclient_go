@@ -90,7 +90,7 @@ func (c *ChunkState) Init(newchunk *atomic.Uint64, reusechunk *atomic.Uint64, kn
 	c.totalSize = totalSize
 }
 
-func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) {
+func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) error {
 	chunkpos := c.C.Scan(b)
 
 	if chunkpos == 0 {
@@ -100,21 +100,29 @@ func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) {
 			c.current_chunk = append(c.current_chunk, b[:chunkpos]...)
 
 			h := sha256.New()
-			_, _ = h.Write(c.current_chunk)
+			if _, err := h.Write(c.current_chunk); err != nil {
+				return fmt.Errorf("failed to hash chunk: %w", err)
+			}
 			bindigest := h.Sum(nil)
 			shahash := hex.EncodeToString(bindigest)
 
 			if _, ok := c.knownChunks.GetOrInsert(shahash, true); !ok {
 				writeDebugLog(fmt.Sprintf("New chunk[%s] %d bytes", shahash, len(c.current_chunk)))
 				c.newchunk.Add(1)
-				_ = client.UploadDynamicCompressedChunk(c.wrid, shahash, c.current_chunk)
+				if err := client.UploadDynamicCompressedChunk(c.wrid, shahash, c.current_chunk); err != nil {
+					return fmt.Errorf("failed to upload chunk %s: %w", shahash, err)
+				}
 			} else {
 				writeDebugLog(fmt.Sprintf("Reuse chunk[%s] %d bytes", shahash, len(c.current_chunk)))
 				c.reusechunk.Add(1)
 			}
 
-			_ = binary.Write(c.chunkdigests, binary.LittleEndian, (c.pos + uint64(len(c.current_chunk))))
-			_, _ = c.chunkdigests.Write(h.Sum(nil))
+			if err := binary.Write(c.chunkdigests, binary.LittleEndian, (c.pos + uint64(len(c.current_chunk)))); err != nil {
+				return fmt.Errorf("failed to write chunk offset: %w", err)
+			}
+			if _, err := c.chunkdigests.Write(h.Sum(nil)); err != nil {
+				return fmt.Errorf("failed to write chunk digest: %w", err)
+			}
 
 			c.assignments_offset = append(c.assignments_offset, c.pos)
 			c.assignments = append(c.assignments, shahash)
@@ -155,20 +163,29 @@ func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) {
 		}
 		c.current_chunk = append(c.current_chunk, b...)
 	}
+	return nil
 }
 
-func (c *ChunkState) Eof(client *pbscommon.PBSClient) {
+func (c *ChunkState) Eof(client *pbscommon.PBSClient) error {
 	if len(c.current_chunk) > 0 {
 		h := sha256.New()
-		_, _ = h.Write(c.current_chunk)
+		if _, err := h.Write(c.current_chunk); err != nil {
+			return fmt.Errorf("failed to hash final chunk: %w", err)
+		}
 
 		shahash := hex.EncodeToString(h.Sum(nil))
-		_ = binary.Write(c.chunkdigests, binary.LittleEndian, (c.pos + uint64(len(c.current_chunk))))
-		_, _ = c.chunkdigests.Write(h.Sum(nil))
+		if err := binary.Write(c.chunkdigests, binary.LittleEndian, (c.pos + uint64(len(c.current_chunk)))); err != nil {
+			return fmt.Errorf("failed to write final chunk offset: %w", err)
+		}
+		if _, err := c.chunkdigests.Write(h.Sum(nil)); err != nil {
+			return fmt.Errorf("failed to write final chunk digest: %w", err)
+		}
 
 		if _, ok := c.knownChunks.GetOrInsert(shahash, true); !ok {
 			writeDebugLog(fmt.Sprintf("New chunk[%s] %d bytes", shahash, len(c.current_chunk)))
-			_ = client.UploadDynamicCompressedChunk(c.wrid, shahash, c.current_chunk)
+			if err := client.UploadDynamicCompressedChunk(c.wrid, shahash, c.current_chunk); err != nil {
+				return fmt.Errorf("failed to upload final chunk %s: %w", shahash, err)
+			}
 			c.newchunk.Add(1)
 		} else {
 			writeDebugLog(fmt.Sprintf("Reuse chunk[%s] %d bytes", shahash, len(c.current_chunk)))
@@ -185,10 +202,15 @@ func (c *ChunkState) Eof(client *pbscommon.PBSClient) {
 		if k2 > len(c.assignments) {
 			k2 = len(c.assignments)
 		}
-		_ = client.AssignDynamicChunks(c.wrid, c.assignments[k:k2], c.assignments_offset[k:k2])
+		if err := client.AssignDynamicChunks(c.wrid, c.assignments[k:k2], c.assignments_offset[k:k2]); err != nil {
+			return fmt.Errorf("failed to assign chunks (batch %d-%d): %w", k, k2, err)
+		}
 	}
 
-	_ = client.CloseDynamicIndex(c.wrid, hex.EncodeToString(c.chunkdigests.Sum(nil)), c.pos, c.chunkcount)
+	if err := client.CloseDynamicIndex(c.wrid, hex.EncodeToString(c.chunkdigests.Sum(nil)), c.pos, c.chunkcount); err != nil {
+		return fmt.Errorf("failed to close dynamic index: %w", err)
+	}
+	return nil
 }
 
 // RunBackupInline performs a backup without external binaries
@@ -373,18 +395,24 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 		return err
 	}
 
-	archive.WriteCB = func(b []byte) {
-		pxarChunk.HandleData(b, client)
+	archive.WriteCB = func(b []byte) error {
+		return pxarChunk.HandleData(b, client)
 	}
 
-	archive.CatalogWriteCB = func(b []byte) {
-		pcat1Chunk.HandleData(b, client)
+	archive.CatalogWriteCB = func(b []byte) error {
+		return pcat1Chunk.HandleData(b, client)
 	}
 
-	archive.WriteDir(backupdir, "", true)
+	if _, err = archive.WriteDir(backupdir, "", true); err != nil {
+		return fmt.Errorf("failed to write directory archive: %w", err)
+	}
 
-	pxarChunk.Eof(client)
-	pcat1Chunk.Eof(client)
+	if err = pxarChunk.Eof(client); err != nil {
+		return err
+	}
+	if err = pcat1Chunk.Eof(client); err != nil {
+		return err
+	}
 
 	err = client.UploadManifest()
 	if err != nil {

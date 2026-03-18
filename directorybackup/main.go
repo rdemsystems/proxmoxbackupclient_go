@@ -129,12 +129,18 @@ func (c *ChunkState) Eof(client *pbscommon.PBSClient) error {
 		}
 
 		shahash := hex.EncodeToString(h.Sum(nil))
-		binary.Write(c.chunkdigests, binary.LittleEndian, (c.pos + uint64(len(c.current_chunk))))
-		c.chunkdigests.Write(h.Sum(nil))
+		if err := binary.Write(c.chunkdigests, binary.LittleEndian, (c.pos + uint64(len(c.current_chunk)))); err != nil {
+			return fmt.Errorf("failed to write final chunk offset: %w", err)
+		}
+		if _, err := c.chunkdigests.Write(h.Sum(nil)); err != nil {
+			return fmt.Errorf("failed to write final chunk digest: %w", err)
+		}
 
 		if _, ok := c.knownChunks.GetOrInsert(shahash, true); !ok {
 			fmt.Printf("New chunk[%s] %d bytes\n", shahash, len(c.current_chunk))
-			client.UploadDynamicCompressedChunk(c.wrid, shahash, c.current_chunk)
+			if err := client.UploadDynamicCompressedChunk(c.wrid, shahash, c.current_chunk); err != nil {
+				return fmt.Errorf("failed to upload final chunk %s: %w", shahash, err)
+			}
 			c.newchunk.Add(1)
 		} else {
 			fmt.Printf("Reuse chunk[%s] %d bytes\n", shahash, len(c.current_chunk))
@@ -152,10 +158,15 @@ func (c *ChunkState) Eof(client *pbscommon.PBSClient) error {
 		if k2 > len(c.assignments) {
 			k2 = len(c.assignments)
 		}
-		client.AssignDynamicChunks(c.wrid, c.assignments[k:k2], c.assignments_offset[k:k2])
+		if err := client.AssignDynamicChunks(c.wrid, c.assignments[k:k2], c.assignments_offset[k:k2]); err != nil {
+			return fmt.Errorf("failed to assign chunks (batch %d-%d): %w", k, k2, err)
+		}
 	}
 
-	client.CloseDynamicIndex(c.wrid, hex.EncodeToString(c.chunkdigests.Sum(nil)), c.pos, c.chunkcount)
+	if err := client.CloseDynamicIndex(c.wrid, hex.EncodeToString(c.chunkdigests.Sum(nil)), c.pos, c.chunkcount); err != nil {
+		return fmt.Errorf("failed to close dynamic index: %w", err)
+	}
+	return nil
 }
 
 func main() {
@@ -330,16 +341,22 @@ func backup_stream(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uin
 
 		b := B[:n]
 
-		streamChunk.HandleData(b, client)
+		if err := streamChunk.HandleData(b, client); err != nil {
+			return fmt.Errorf("failed to handle stream data: %w", err)
+		}
 
 		if err == io.EOF {
 			break
 		}
 	}
 
-	streamChunk.Eof(client)
+	if err := streamChunk.Eof(client); err != nil {
+		return fmt.Errorf("failed to finalize stream: %w", err)
+	}
 
-	client.CloseDynamicIndex(streamChunk.wrid, hex.EncodeToString(streamChunk.chunkdigests.Sum(nil)), streamChunk.pos, streamChunk.chunkcount)
+	if err := client.CloseDynamicIndex(streamChunk.wrid, hex.EncodeToString(streamChunk.chunkdigests.Sum(nil)), streamChunk.pos, streamChunk.chunkcount); err != nil {
+		return fmt.Errorf("failed to close stream index: %w", err)
+	}
 
 	err = client.UploadManifest()
 	if err != nil {
@@ -416,29 +433,38 @@ func backup_real(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint6
 		return err
 	}
 
-	archive.WriteCB = func(b []byte) {
+	archive.WriteCB = func(b []byte) error {
 
 		if pxarOut != "" {
-			// TODO: error handling inside callback
-			f.Write(b)
+			if _, err := f.Write(b); err != nil {
+				return fmt.Errorf("failed to write to pxar output file: %w", err)
+			}
 		}
 
-		pxarChunk.HandleData(b, client)
+		if err := pxarChunk.HandleData(b, client); err != nil {
+			return err
+		}
 
-		//
+		return nil
 	}
 
-	archive.CatalogWriteCB = func(b []byte) {
-		pcat1Chunk.HandleData(b, client)
+	archive.CatalogWriteCB = func(b []byte) error {
+		return pcat1Chunk.HandleData(b, client)
 	}
 
 	//This is the entry point of backup job which will start streaming with the PCAT and PXAR write callback
 	//Data to be hashed and eventuall uploaded
 
-	archive.WriteDir(backupdir, "", true)
+	if _, err = archive.WriteDir(backupdir, "", true); err != nil {
+		return fmt.Errorf("failed to write directory archive: %w", err)
+	}
 
-	pxarChunk.Eof(client)
-	pcat1Chunk.Eof(client)
+	if err = pxarChunk.Eof(client); err != nil {
+		return err
+	}
+	if err = pcat1Chunk.Eof(client); err != nil {
+		return err
+	}
 
 	err = client.UploadManifest()
 	if err != nil {
