@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-03-18
+
+### Fixed
+- **Error handling** - Fixed 6 errcheck linting errors
+  - config_test.go: Check os.Setenv return values (4 occurrences)
+  - main.go: Check logFile.Close() and f.Close() return values
+  - All deferred calls now properly handle error returns
+
+### Code Quality
+- Improved error handling patterns
+- Better resource cleanup in deferred functions
+- Zero errcheck warnings
+
 ## [0.1.14] - 2026-03-18
 
 ### Fixed
