@@ -100,6 +100,7 @@ type PBSClient struct {
 	TLSConfig tls.Config
 
 	WritersManifest map[uint64]int
+	SkippedFiles    []string // Track files/dirs skipped during backup
 }
 
 const PBS_FIXED_CHUNK_SIZE = 4 * 1024 * 1024
@@ -511,6 +512,7 @@ func (pbs *PBSClient) Finish() error {
 
 func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 	pbs.WritersManifest = make(map[uint64]int)
+	pbs.SkippedFiles = []string{} // Reset skipped files for new backup
 	pbs.TLSConfig = tls.Config{
 		InsecureSkipVerify: pbs.Insecure,
 	}
@@ -547,12 +549,22 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 		pbs.Manifest.BackupID = hostname
 	}
 
-	// Close any existing HTTP/2 connections from previous failed backups
-	// This prevents reusing stale/broken connections
+	// Close any existing HTTP/2 connections from previous backups (successful or failed)
+	// This prevents reusing stale/broken connections that might cause 400 errors
 	if pbs.Client.Transport != nil {
+		// Close all idle connections first
 		pbs.Client.CloseIdleConnections()
+
+		// If it's an http2.Transport, force close it
+		if h2Transport, ok := pbs.Client.Transport.(*http2.Transport); ok {
+			h2Transport.CloseIdleConnections()
+		}
+
+		// Nil out the transport to ensure it's garbage collected
+		pbs.Client.Transport = nil
 	}
 
+	// Create completely new client with fresh HTTP/2 transport
 	pbs.Client = http.Client{
 		Transport: &http2.Transport{
 

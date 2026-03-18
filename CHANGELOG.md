@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-03-18
+
+### Fixed
+- **Critical file access error handling** - Gracefully skip inaccessible files/directories
+  - Changed file/directory access errors from fatal to warning + skip
+  - Backup continues when encountering locked, permission-denied, or inaccessible files
+  - Skipped files tracked and reported in backup completion message
+  - Logged to debug.log with full details (first 50 shown)
+  - GUI displays count: "⚠️ N fichiers/dossiers ignorés"
+  - Fixes "The system cannot access the file" crashes
+
+- **HTTP/2 transport cleanup improvements** - More thorough connection recycling
+  - Explicitly close http2.Transport connections, not just http.Client
+  - Nil out old transport to force garbage collection
+  - Ensures fresh connection state on every Connect() call
+  - Reset SkippedFiles list on each new backup
+  - Fixes persistent 400 errors when retrying after failed backup
+
+### Added
+- **Skipped files reporting**
+  - PXARArchive.SkippedFiles tracks all skipped paths with reason
+  - PBSClient.SkippedFiles accumulates skipped files across multiple archives
+  - Completion message includes count and warning
+  - Debug log shows detailed list (first 50 items)
+  - Format: "Cannot open file: [path] (Error: [reason])"
+
+### Technical Details
+- WriteDir() and WriteFile() log access errors as warnings, return nil to continue
+- Skipped files collected in archive.SkippedFiles array
+- Transferred to client.SkippedFiles after each archive completion
+- HTTP/2 transport explicitly type-cast and closed before replacement
+- Old transport set to nil to prevent connection reuse
+
+### Root Cause Analysis
+Bug #1 - File Access Crashes:
+- Backup progressed until hitting inaccessible file → crash
+- Examples: VSS snapshot directories, locked system files, permission-denied AppData files
+- Junction point skipping (v0.1.26) wasn't enough - needed graceful error handling for ALL file access errors
+- Solution: Skip any file that fails to stat/open, log it, report it, continue backup
+
+Bug #2 - HTTP/2 Connection State:
+- After failed backup, HTTP/2 connection left in bad state
+- Next Connect() called CloseIdleConnections() but didn't fully reset transport
+- Active/broken connections not properly closed
+- Result: second backup attempt gets 400 Bad Request from PBS
+
 ## [0.1.27] - 2026-03-18
 
 ### Fixed

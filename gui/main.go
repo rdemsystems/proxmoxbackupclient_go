@@ -28,7 +28,7 @@ const (
 )
 
 // Version will be injected at build time via ldflags
-var appVersion = "0.1.27" // Updated manually until ldflags injection works
+var appVersion = "0.1.28" // Updated manually until ldflags injection works
 
 var (
 	debugLogPath    string

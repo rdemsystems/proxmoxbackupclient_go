@@ -150,7 +150,8 @@ type PXARArchive struct {
 	pos            uint64
 	ArchiveName    string
 
-	catalog_pos uint64
+	catalog_pos  uint64
+	SkippedFiles []string // Track files/directories skipped due to access errors
 }
 
 //This function will flush the internal buffer and update position
@@ -244,18 +245,28 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) (Cata
 	// Check if directory is a junction point/symlink before reading it
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
-		return CatalogDir{}, fmt.Errorf("failed to stat %s: %w", path, err)
+		// Log stat errors but continue backup - don't fail on inaccessible directories
+		skipMsg := fmt.Sprintf("Cannot stat directory: %s (Error: %v)", path, err)
+		fmt.Printf("Warning: %s\n", skipMsg)
+		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
+		return CatalogDir{}, nil
 	}
 
 	// Skip directory junction points to avoid infinite loops and access errors
 	if !toplevel && fileInfo.Mode()&os.ModeSymlink != 0 {
-		fmt.Printf("Skipping directory junction point: %s\n", path)
+		skipMsg := fmt.Sprintf("Junction point (skipped): %s", path)
+		fmt.Printf("%s\n", skipMsg)
+		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogDir{}, nil // Return nil error to continue backup
 	}
 
 	files, err := os.ReadDir(path)
 	if err != nil {
-		return CatalogDir{}, fmt.Errorf("failed to read directory %s: %w", path, err)
+		// Log read errors but continue backup - don't fail on permission denied, locked files, etc.
+		skipMsg := fmt.Sprintf("Cannot read directory: %s (Error: %v)", path, err)
+		fmt.Printf("Warning: %s\n", skipMsg)
+		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
+		return CatalogDir{}, nil
 	}
 
 	//Avoid writing filename entry on root
@@ -451,19 +462,29 @@ func (a *PXARArchive) WriteFile(path string, basename string) (CatalogFile, erro
 	// Use Lstat to detect symlinks/junction points without following them
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
-		return CatalogFile{}, fmt.Errorf("failed to stat %s: %w", path, err)
+		// Log stat errors but continue backup - don't fail on inaccessible files
+		skipMsg := fmt.Sprintf("Cannot stat file: %s (Error: %v)", path, err)
+		fmt.Printf("Warning: %s\n", skipMsg)
+		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
+		return CatalogFile{}, nil
 	}
 
 	// Skip junction points and symlinks (common on Windows: "Application Data", etc.)
 	if fileInfo.Mode()&os.ModeSymlink != 0 {
-		fmt.Printf("Skipping junction point/symlink: %s\n", path)
+		skipMsg := fmt.Sprintf("Junction point (skipped): %s", path)
+		fmt.Printf("%s\n", skipMsg)
+		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
 		return CatalogFile{}, nil // Return nil error to continue backup
 	}
 
 	file, err := os.Open(path)
 
 	if err != nil {
-		return CatalogFile{}, fmt.Errorf("failed to open %s: %w", path, err)
+		// Log file open errors but continue backup - don't fail on locked/system files
+		skipMsg := fmt.Sprintf("Cannot open file: %s (Error: %v)", path, err)
+		fmt.Printf("Warning: %s\n", skipMsg)
+		a.SkippedFiles = append(a.SkippedFiles, skipMsg)
+		return CatalogFile{}, nil
 	}
 
 	defer file.Close()

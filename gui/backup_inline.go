@@ -371,10 +371,33 @@ func RunBackupInline(opts BackupOptions) error {
 	}
 
 	progress(1.0, "Backup completed")
-	writeDebugLog(fmt.Sprintf("Backup completed: New %d chunks, Reused %d chunks", newchunk.Load(), reusechunk.Load()))
+
+	// Build completion message with skipped files info
+	completionMsg := fmt.Sprintf("Backup completed: %d new, %d reused chunks", newchunk.Load(), reusechunk.Load())
+
+	if len(client.SkippedFiles) > 0 {
+		completionMsg += fmt.Sprintf("\n⚠️  %d fichiers/dossiers ignorés (accès refusé ou junction points)", len(client.SkippedFiles))
+		writeDebugLog(fmt.Sprintf("=== SKIPPED FILES/DIRECTORIES (%d) ===", len(client.SkippedFiles)))
+
+		// Log first 50 skipped files in detail
+		maxLog := 50
+		if len(client.SkippedFiles) < maxLog {
+			maxLog = len(client.SkippedFiles)
+		}
+		for i := 0; i < maxLog; i++ {
+			writeDebugLog(fmt.Sprintf("  [%d] %s", i+1, client.SkippedFiles[i]))
+		}
+		if len(client.SkippedFiles) > 50 {
+			writeDebugLog(fmt.Sprintf("  ... and %d more (see full list in GUI)", len(client.SkippedFiles)-50))
+		}
+		writeDebugLog("=== END SKIPPED FILES ===")
+	}
+
+	writeDebugLog(fmt.Sprintf("Backup completed: New %d chunks, Reused %d chunks, Skipped %d files",
+		newchunk.Load(), reusechunk.Load(), len(client.SkippedFiles)))
 
 	if opts.OnComplete != nil {
-		opts.OnComplete(true, fmt.Sprintf("Backup completed: %d new, %d reused chunks", newchunk.Load(), reusechunk.Load()))
+		opts.OnComplete(true, completionMsg)
 	}
 
 	return nil
@@ -459,6 +482,12 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 
 	if _, err = archive.WriteDir(backupdir, "", true); err != nil {
 		return fmt.Errorf("failed to write directory archive: %w", err)
+	}
+
+	// Collect skipped files from archive
+	if len(archive.SkippedFiles) > 0 {
+		writeDebugLog(fmt.Sprintf("Backup completed with %d skipped files/directories", len(archive.SkippedFiles)))
+		client.SkippedFiles = append(client.SkippedFiles, archive.SkippedFiles...)
 	}
 
 	if err = pxarChunk.Eof(client); err != nil {

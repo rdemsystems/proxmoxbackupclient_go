@@ -57,21 +57,21 @@ cli: cli-directory cli-machine cli-nbd
 cli-directory:
 	@echo "🔨 Building Directory Backup CLI..."
 	@mkdir -p $(BUILD_DIR)
-	cd directorybackup && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
+	cd directorybackup && go mod tidy && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
 		-o ../$(BUILD_DIR)/$(CLI_DIR_BIN)$(shell go env GOEXE)
 	@echo "✅ Built: $(BUILD_DIR)/$(CLI_DIR_BIN)"
 
 cli-machine:
 	@echo "🔨 Building Machine Backup CLI..."
 	@mkdir -p $(BUILD_DIR)
-	cd machinebackup && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
+	cd machinebackup && go mod tidy && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
 		-o ../$(BUILD_DIR)/$(CLI_MACHINE_BIN)$(shell go env GOEXE)
 	@echo "✅ Built: $(BUILD_DIR)/$(CLI_MACHINE_BIN)"
 
 cli-nbd:
 	@echo "🔨 Building NBD Server CLI..."
 	@mkdir -p $(BUILD_DIR)
-	cd nbd && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
+	cd nbd && go mod tidy && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
 		-o ../$(BUILD_DIR)/$(CLI_NBD_BIN)$(shell go env GOEXE)
 	@echo "✅ Built: $(BUILD_DIR)/$(CLI_NBD_BIN)"
 
