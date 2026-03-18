@@ -75,10 +75,12 @@ type BackupManifest struct {
 }
 
 type AuthErr struct {
+	StatusCode   string
+	ResponseBody string
 }
 
 func (e *AuthErr) Error() string {
-	return "Authentication error"
+	return fmt.Sprintf("PBS authentication failed: HTTP %s - %s", e.StatusCode, e.ResponseBody)
 }
 
 type PBSClient struct {
@@ -585,9 +587,11 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 				if len(lines) > 0 {
 					toks := strings.Split(lines[0], " ")
 					if len(toks) > 1 && toks[1] != "101" {
-						fmt.Println("Unexpected response code: " + strings.Join(toks[1:], " "))
-						fmt.Println(string(buf))
-						return nil, &AuthErr{}
+						statusCode := strings.Join(toks[1:], " ")
+						return nil, &AuthErr{
+							StatusCode:   statusCode,
+							ResponseBody: string(buf),
+						}
 					}
 				}
 

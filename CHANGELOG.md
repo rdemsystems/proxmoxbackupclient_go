@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-03-18
+
+### Fixed
+- **CRITICAL: PBS authentication error now shows real HTTP response**
+  - AuthErr struct modified to capture StatusCode and ResponseBody
+  - DialTLSContext function (line 587-594) now passes actual PBS error details
+  - Replaces generic "Authentication error" with detailed message
+  - Will reveal actual HTTP status code and PBS error message
+  - Bug existed since HTTP/2 upgrade implementation
+  - This should finally show why backups fail after connection test succeeds
+
+### Debugging
+- **Previous behavior**: Printed PBS response to stdout (invisible), returned generic error
+- **New behavior**: Captures and returns "PBS authentication failed: HTTP [code] - [response]"
+- Will help identify if issue is HTTP/2 upgrade, authentication, or PBS server-side
+
 ## [0.1.19] - 2026-03-18
 
 ### Fixed
