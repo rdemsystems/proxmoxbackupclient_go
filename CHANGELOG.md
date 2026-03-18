@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-03-18
+
+### Added
+- **Comprehensive debug logging for CreateDynamicIndex**
+  - Logs archive name, BaseURL, request URL
+  - Shows all request headers
+  - Logs response status, proto, and body
+  - Detailed error messages with error types
+  - Will reveal if HTTP/2 client is working after upgrade
+
+### Debugging
+- Hypothesis: Connect() succeeds but CreateDynamicIndex fails
+- Error "HTTP request failed Post /dynamic_index" comes from line 274
+- This means pbs.Client.Do() is failing, not PBS returning 400
+- Logs will show exact failure point
+
 ## [0.1.23] - 2026-03-18
 
 ### Fixed

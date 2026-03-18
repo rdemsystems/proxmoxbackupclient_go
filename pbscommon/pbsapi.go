@@ -260,23 +260,38 @@ func (pbs *PBSClient) CloseFixedIndex(writerid uint64, checksum string, totalsiz
 }
 
 func (pbs *PBSClient) CreateDynamicIndex(name string) (uint64, error) {
+	fmt.Printf("=== CreateDynamicIndex START ===\n")
+	fmt.Printf("Archive name: %s\n", name)
+	fmt.Printf("BaseURL: %s\n", pbs.BaseURL)
 
 	req, err := http.NewRequest("POST", pbs.BaseURL+"/dynamic_index", bytes.NewBuffer([]byte(fmt.Sprintf("{\"archive-name\": \"%s\"}", name))))
 	if err != nil {
+		fmt.Printf("ERROR: Failed to create request: %v\n", err)
 		return 0, err
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("PBSAPIToken=%s:%s", pbs.AuthID, pbs.Secret))
 	req.Header.Set("Content-Type", "application/json; charset=UTF-8")
 
+	fmt.Printf("Sending POST request to: %s\n", req.URL.String())
+	fmt.Printf("Headers: %+v\n", req.Header)
+
 	resp2, err := pbs.Client.Do(req)
 	if err != nil {
+		fmt.Printf("ERROR: HTTP request failed: %v\n", err)
+		fmt.Printf("ERROR: Error type: %T\n", err)
 		return 0, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp2.Body.Close()
 
+	fmt.Printf("Response status: %d %s\n", resp2.StatusCode, resp2.Status)
+	fmt.Printf("Response proto: %s\n", resp2.Proto)
+
 	if resp2.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp2.Body)
+		fmt.Printf("ERROR: PBS returned non-200 status\n")
+		fmt.Printf("Status: %d\n", resp2.StatusCode)
+		fmt.Printf("Body: %s\n", string(bodyBytes))
 		return 0, fmt.Errorf("PBS returned HTTP %d: %s", resp2.StatusCode, string(bodyBytes))
 	}
 
