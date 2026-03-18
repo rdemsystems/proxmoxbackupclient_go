@@ -7,8 +7,8 @@ require (
 	github.com/wailsapp/wails/v2 v2.8.0
 	clientcommon v0.0.0
 	pbscommon v0.0.0
-	pkg/retry v0.0.0
-	pkg/security v0.0.0
+	retry v0.0.0
+	security v0.0.0
 	snapshot v0.0.0
 )
 
@@ -46,7 +46,7 @@ require (
 replace (
 	clientcommon => ../clientcommon
 	pbscommon => ../pbscommon
-	pkg/retry => ../pkg/retry
-	pkg/security => ../pkg/security
+	retry => ../pkg/retry
+	security => ../pkg/security
 	snapshot => ../snapshot
 )

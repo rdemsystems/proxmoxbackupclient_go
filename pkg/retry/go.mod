@@ -1,3 +1,3 @@
-module pkg/retry
+module retry
 
 go 1.21

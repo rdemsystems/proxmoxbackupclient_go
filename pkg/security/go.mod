@@ -1,3 +1,3 @@
-module pkg/security
+module security
 
 go 1.21

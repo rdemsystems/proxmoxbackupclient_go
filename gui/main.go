@@ -18,7 +18,7 @@ import (
 	wailswin "github.com/wailsapp/wails/v2/pkg/options/windows"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"pbscommon"
-	"pkg/security"
+	"security"
 )
 
 //go:embed all:frontend/dist

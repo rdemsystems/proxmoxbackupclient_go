@@ -15,8 +15,8 @@ import (
 
 	"github.com/cornelk/hashmap"
 	"pbscommon"
-	"pkg/retry"
-	"pkg/security"
+	"retry"
+	"security"
 	"snapshot"
 )
 

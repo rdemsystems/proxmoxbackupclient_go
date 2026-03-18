@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"pkg/security"
+	"security"
 )
 
 type Config struct {
