@@ -30,44 +30,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
 
-      - name: Update all module dependencies
+      - name: Verify dependencies
+        working-directory: gui
         env:
           GOWORK: off
         run: |
-          # Update gui (critical for CI)
-          cd gui
-          go get -u golang.org/x/crypto golang.org/x/net golang.org/x/sys golang.org/x/text golang.org/x/exp
-          go get -u github.com/wailsapp/wails/v2 github.com/google/uuid github.com/labstack/echo/v4
-          go mod tidy
-
-          # Update snapshot (very old golang.org/x/sys)
-          cd ../snapshot
-          go get -u github.com/go-ole/go-ole golang.org/x/sys
-          go mod tidy
-
-          # Update machinebackup (extremely old golang.org/x/sys from 2020)
-          cd ../machinebackup
-          go get -u github.com/go-ole/go-ole github.com/google/uuid golang.org/x/sys
-          go mod tidy
-
-          # Update service
-          cd ../service
-          go get -u github.com/kardianos/service golang.org/x/sys
-          go mod tidy
-
-          # Update pbscommon
-          cd ../pbscommon
-          go get -u github.com/klauspost/compress golang.org/x/net golang.org/x/text
-          go mod tidy
-
-          # Update directorybackup
-          cd ../directorybackup
-          go get -u github.com/cornelk/hashmap golang.org/x/exp golang.org/x/text golang.org/x/sys
-          go mod tidy
-
-          # Update nbd
-          cd ../nbd
-          go get -u github.com/pojntfx/go-nbd github.com/rivo/tview golang.org/x/sys golang.org/x/term golang.org/x/text
+          go mod download
+          go mod verify
           go mod tidy
 
       - name: Run gosec
@@ -105,44 +74,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
 
-      - name: Update all module dependencies
+      - name: Verify dependencies
+        working-directory: gui
         env:
           GOWORK: off
         run: |
-          # Update gui (critical for CI)
-          cd gui
-          go get -u golang.org/x/crypto golang.org/x/net golang.org/x/sys golang.org/x/text golang.org/x/exp
-          go get -u github.com/wailsapp/wails/v2 github.com/google/uuid github.com/labstack/echo/v4
-          go mod tidy
-
-          # Update snapshot (very old golang.org/x/sys)
-          cd ../snapshot
-          go get -u github.com/go-ole/go-ole golang.org/x/sys
-          go mod tidy
-
-          # Update machinebackup (extremely old golang.org/x/sys from 2020)
-          cd ../machinebackup
-          go get -u github.com/go-ole/go-ole github.com/google/uuid golang.org/x/sys
-          go mod tidy
-
-          # Update service
-          cd ../service
-          go get -u github.com/kardianos/service golang.org/x/sys
-          go mod tidy
-
-          # Update pbscommon
-          cd ../pbscommon
-          go get -u github.com/klauspost/compress golang.org/x/net golang.org/x/text
-          go mod tidy
-
-          # Update directorybackup
-          cd ../directorybackup
-          go get -u github.com/cornelk/hashmap golang.org/x/exp golang.org/x/text golang.org/x/sys
-          go mod tidy
-
-          # Update nbd
-          cd ../nbd
-          go get -u github.com/pojntfx/go-nbd github.com/rivo/tview golang.org/x/sys golang.org/x/term golang.org/x/text
+          go mod download
+          go mod verify
           go mod tidy
 
       - name: Run tests
