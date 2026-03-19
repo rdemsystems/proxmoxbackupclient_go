@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.71 (2026-03-19)
+- **FIX**: Unified log location in C:\ProgramData\NimbusBackup\debug.log
+- **FEATURE**: GUI and Service now write to same log file (easy debugging!)
+- **QUALITY**: No more hidden logs in SYSTEM AppData
+
 ### v0.1.70 (2026-03-19)
 - **FIX**: Build error - removed unused pbsBackupType variable
 
@@ -161,5 +166,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.70
+**Version actuelle:** 0.1.71
 **Dernière mise à jour:** 2026-03-19
