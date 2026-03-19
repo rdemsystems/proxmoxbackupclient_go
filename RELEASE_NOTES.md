@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.74 (2026-03-19)
+- **FEATURE**: Real-time backup progress tracking via API callbacks
+- **FEATURE**: Custom progress callbacks for API server mode
+- **FIX**: Remove unused getJobHistoryPathLegacy function
+- **ARCHITECTURE**: Progress updates now flow from backup execution to API progress map
+
 ### v0.1.73 (2026-03-19)
 - **FIX**: gosec G703 warnings for ProgramData path usage
 - **QUALITY**: Added nosec comments with justification for false positive path traversal warnings
@@ -176,5 +182,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.73
+**Version actuelle:** 0.1.74
 **Dernière mise à jour:** 2026-03-19

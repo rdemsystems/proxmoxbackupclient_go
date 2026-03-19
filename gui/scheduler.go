@@ -90,21 +90,6 @@ func getJobHistoryPath() (string, error) {
 	return filepath.Join(configDir, "job_history.json"), nil
 }
 
-// Legacy function for compatibility - remove after migration
-func getJobHistoryPathLegacy() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	configDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
-	if err := os.MkdirAll(configDir, 0700); err != nil {
-		return "", err
-	}
-
-	return filepath.Join(configDir, "job_history.json"), nil
-}
-
 // SaveScheduledJob saves a new scheduled job
 func (a *App) SaveScheduledJob(job ScheduledJob) error {
 	writeDebugLog(fmt.Sprintf("SaveScheduledJob called for: %s", job.Name))

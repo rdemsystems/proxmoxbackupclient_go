@@ -64,7 +64,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := StatusResponse{
 		Running:       true,
-		Version:       "0.1.73", // TODO: get from build
+		Version:       "0.1.74", // TODO: get from build
 		ActiveJobs:    0,         // TODO: track active jobs
 		Configuration: config,
 	}
@@ -107,9 +107,41 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		log.Printf("[API] Starting async backup: %s", jobID)
-		// Call startBackupDirect directly - service must execute, not route
-		// Note: startBackupDirect is not exported, so we need to expose it or use a different approach
-		// For now, we'll call StartBackup but ensure service App is in standalone mode
+
+		// Set up progress callbacks to update the progress map
+		handler, ok := s.app.(interface {
+			SetProgressCallbacks(jobID string, onProgress func(string, float64, string), onComplete func(string, bool, string))
+		})
+		if ok {
+			handler.SetProgressCallbacks(
+				jobID,
+				func(jid string, percent float64, message string) {
+					s.progressMutex.Lock()
+					if progress, exists := s.backupProgress[jid]; exists {
+						progress.Progress = percent
+						progress.Message = message
+						log.Printf("[API] Progress update %s: %.1f%% - %s", jid, percent, message)
+					}
+					s.progressMutex.Unlock()
+				},
+				func(jid string, success bool, message string) {
+					s.progressMutex.Lock()
+					if progress, exists := s.backupProgress[jid]; exists {
+						progress.Running = false
+						progress.Complete = true
+						progress.Success = success
+						progress.Message = message
+						if !success {
+							progress.Error = message
+						}
+						log.Printf("[API] Backup %s complete: success=%v, %s", jid, success, message)
+					}
+					s.progressMutex.Unlock()
+				},
+			)
+		}
+
+		// Call StartBackup (service App is in standalone mode to execute directly)
 		err := s.app.StartBackup(
 			req.BackupType,
 			req.BackupDirs,
@@ -119,9 +151,9 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 			req.UseVSS,
 		)
 
-		// Update final status
+		// Update final status if callbacks didn't fire
 		s.progressMutex.Lock()
-		if progress, exists := s.backupProgress[jobID]; exists {
+		if progress, exists := s.backupProgress[jobID]; exists && !progress.Complete {
 			progress.Running = false
 			progress.Complete = true
 			if err != nil {

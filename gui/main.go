@@ -218,11 +218,14 @@ Please report this issue to RDEM Systems:
 
 // App struct
 type App struct {
-	ctx           context.Context
-	config        *Config
-	stopScheduler chan struct{}
-	apiClient     *api.Client
-	mode          api.ExecutionMode
+	ctx              context.Context
+	config           *Config
+	stopScheduler    chan struct{}
+	apiClient        *api.Client
+	mode             api.ExecutionMode
+	customOnProgress func(jobID string, percent float64, message string)
+	customOnComplete func(jobID string, success bool, message string)
+	currentJobID     string
 }
 
 // NewApp creates a new App application struct
@@ -232,6 +235,13 @@ func NewApp() *App {
 		stopScheduler: make(chan struct{}),
 		apiClient:     api.NewClient(),
 	}
+}
+
+// SetProgressCallbacks sets custom progress callbacks for API mode
+func (a *App) SetProgressCallbacks(jobID string, onProgress func(string, float64, string), onComplete func(string, bool, string)) {
+	a.currentJobID = jobID
+	a.customOnProgress = onProgress
+	a.customOnComplete = onComplete
 }
 
 // startup is called when the app starts
@@ -554,8 +564,12 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 		UseVSS:          useVSS,
 		OnProgress: func(percent float64, message string) {
 			writeDebugLog(fmt.Sprintf("Progress: %.1f%% - %s", percent*100, message))
-			// Only emit events if Wails context is available (GUI mode)
-			if a.ctx != nil {
+
+			// Use custom callback if set (API server mode)
+			if a.customOnProgress != nil && a.currentJobID != "" {
+				a.customOnProgress(a.currentJobID, percent*100, message)
+			} else if a.ctx != nil {
+				// Otherwise emit Wails events (GUI mode)
 				runtime.EventsEmit(a.ctx, "backup:progress", map[string]interface{}{
 					"percent": percent * 100,
 					"message": message,
@@ -564,8 +578,12 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 		},
 		OnComplete: func(success bool, message string) {
 			writeDebugLog(fmt.Sprintf("Backup complete: success=%v, %s", success, message))
-			// Only emit events if Wails context is available (GUI mode)
-			if a.ctx != nil {
+
+			// Use custom callback if set (API server mode)
+			if a.customOnComplete != nil && a.currentJobID != "" {
+				a.customOnComplete(a.currentJobID, success, message)
+			} else if a.ctx != nil {
+				// Otherwise emit Wails events (GUI mode)
 				runtime.EventsEmit(a.ctx, "backup:complete", map[string]interface{}{
 					"success": success,
 					"message": message,
