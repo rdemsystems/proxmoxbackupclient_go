@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.57 (2026-03-19)
+- **FIX**: MSI ICE80 error - add Platform="x64" declaration
+- **BUILD**: Proper 64-bit installer configuration for WiX
+- **QUALITY**: MSI package validation now passes
+
 ### v0.1.56 (2026-03-19)
 - **FIX**: MSI installer build - remove custom image references
 - **BUILD**: Use default WiX UI images (no custom branding required)
@@ -168,5 +173,5 @@
 
 ---
 
-**Version actuelle:** 0.1.56
+**Version actuelle:** 0.1.57
 **Dernière mise à jour:** 2026-03-19
