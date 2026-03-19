@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.56 (2026-03-19)
+- **FIX**: MSI installer build - remove custom image references
+- **BUILD**: Use default WiX UI images (no custom branding required)
+- **CI**: MSI build now completes successfully
+
 ### v0.1.55 (2026-03-19)
 - **FIX**: All 24 staticcheck ST1005 linting errors corrected
 - **QUALITY**: Error strings now follow Go conventions (lowercase, no trailing punctuation)
@@ -163,5 +168,5 @@
 
 ---
 
-**Version actuelle:** 0.1.55
+**Version actuelle:** 0.1.56
 **Dernière mise à jour:** 2026-03-19
