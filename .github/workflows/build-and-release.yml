@@ -207,8 +207,10 @@ jobs:
           cd artifacts/cli-macOS && tar -czf ../../release/nimbus-backup-cli-${{ steps.version.outputs.VERSION }}-macos.tar.gz *
           cd ../..
 
-          # GUI Windows
-          cd artifacts/NimbusBackup-Windows && zip ../../release/NimbusBackup-${{ steps.version.outputs.VERSION }}-windows.zip *
+          # GUI Windows - Add both .exe and .zip
+          cd artifacts/NimbusBackup-Windows
+          cp NimbusBackup.exe ../../release/NimbusBackup-${{ steps.version.outputs.VERSION }}.exe
+          zip ../../release/NimbusBackup-${{ steps.version.outputs.VERSION }}-windows.zip *
           cd ../..
 
       - name: Generate release notes
