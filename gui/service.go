@@ -30,15 +30,15 @@ func (s *NimbusService) run() {
 	// Initialize app
 	s.app = &App{}
 
-	// Load configuration
-	config, hostname, err := s.app.GetConfigWithHostname()
-	if err != nil {
-		writeDebugLog(fmt.Sprintf("Service: Failed to load config: %v", err))
-		// Continue anyway, config might be set via GUI later
+	// Load configuration (service will read config from file when needed)
+	configMap := s.app.GetConfigWithHostname()
+	if hostname, ok := configMap["hostname"].(string); ok {
+		writeDebugLog(fmt.Sprintf("Service: Running for %s", hostname))
 	} else {
-		s.app.config = config
-		writeDebugLog(fmt.Sprintf("Service: Config loaded for %s", hostname))
+		writeDebugLog("Service: Running in background")
 	}
+
+	// Config will be loaded from file by each scheduled job when needed
 
 	// Clean up any abandoned jobs from previous crash
 	s.app.CleanupAbandonedJobs()
