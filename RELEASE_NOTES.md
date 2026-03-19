@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.50 (2026-03-19)
+- **UPGRADE**: All Go modules upgraded to Go 1.25
+- **FIX**: CI golangci-lint compatibility (now uses latest version)
+- **FEAT**: Automatic update of critical packages in CI (golang.org/x/*, wails/v2)
+- **DOCS**: Complete package audit documented in PACKAGES_UPDATE.md
+
 ### v0.1.49 (2026-03-19)
 - **FEAT**: MSI installer now included in GitHub releases
 - **FEAT**: Auto-cleanup legacy auto-start on app startup
@@ -131,5 +137,5 @@
 
 ---
 
-**Version actuelle:** 0.1.49
+**Version actuelle:** 0.1.50
 **Dernière mise à jour:** 2026-03-19
