@@ -52,6 +52,10 @@ func init() {
 	if programData := os.Getenv("ProgramData"); programData != "" {
 		// Windows: use C:\ProgramData\NimbusBackup (shared between GUI and Service)
 		logDir = filepath.Join(programData, "NimbusBackup")
+	} else if systemDrive := os.Getenv("SystemDrive"); systemDrive != "" {
+		// Windows fallback: if ProgramData not set, use C:\ProgramData hardcoded
+		// This ensures service logs are accessible even if env var is missing
+		logDir = filepath.Join(systemDrive, "ProgramData", "NimbusBackup")
 	} else {
 		// Unix-like: use ~/.nimbus-backup
 		homeDir, _ := os.UserHomeDir()

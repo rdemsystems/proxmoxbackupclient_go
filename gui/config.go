@@ -41,6 +41,10 @@ func getConfigPath() (string, error) {
 	if programData := os.Getenv("ProgramData"); programData != "" {
 		// Windows: C:\ProgramData\NimbusBackup (accessible by both user and LocalSystem)
 		configDir = filepath.Join(programData, "NimbusBackup")
+	} else if systemDrive := os.Getenv("SystemDrive"); systemDrive != "" {
+		// Windows fallback: if ProgramData not set, use C:\ProgramData hardcoded
+		// This ensures service config is accessible even if env var is missing
+		configDir = filepath.Join(systemDrive, "ProgramData", "NimbusBackup")
 	} else {
 		// Unix-like: use ~/.proxmox-backup-guardian
 		homeDir, err := os.UserHomeDir()

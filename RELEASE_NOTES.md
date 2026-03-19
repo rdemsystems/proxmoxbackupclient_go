@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.78 (2026-03-19)
+- **CRITICAL FIX**: Service logs accessible even if %ProgramData% env var missing
+- **FIX**: Hardcoded fallback to C:\ProgramData\NimbusBackup on Windows
+- **FIX**: Prevents service logs from being written to SYSTEM profile directory
+- **QUALITY**: Service logs guaranteed to be in accessible location
+
 ### v0.1.77 (2026-03-19)
 - **FIX**: Empty backup-id now fallbacks to hostname (as intended)
 - **FIX**: Backup no longer fails with empty backup-id field
@@ -196,5 +202,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.77
+**Version actuelle:** 0.1.78
 **Dernière mise à jour:** 2026-03-19

@@ -49,6 +49,9 @@ func getScheduledJobsPath() (string, error) {
 	if programData := os.Getenv("ProgramData"); programData != "" {
 		// Windows: C:\ProgramData\NimbusBackup
 		configDir = filepath.Join(programData, "NimbusBackup")
+	} else if systemDrive := os.Getenv("SystemDrive"); systemDrive != "" {
+		// Windows fallback: if ProgramData not set, use C:\ProgramData hardcoded
+		configDir = filepath.Join(systemDrive, "ProgramData", "NimbusBackup")
 	} else {
 		// Unix-like: use ~/.proxmox-backup-guardian
 		homeDir, err := os.UserHomeDir()
@@ -73,6 +76,9 @@ func getJobHistoryPath() (string, error) {
 	if programData := os.Getenv("ProgramData"); programData != "" {
 		// Windows: C:\ProgramData\NimbusBackup
 		configDir = filepath.Join(programData, "NimbusBackup")
+	} else if systemDrive := os.Getenv("SystemDrive"); systemDrive != "" {
+		// Windows fallback: if ProgramData not set, use C:\ProgramData hardcoded
+		configDir = filepath.Join(systemDrive, "ProgramData", "NimbusBackup")
 	} else {
 		// Unix-like: use ~/.proxmox-backup-guardian
 		homeDir, err := os.UserHomeDir()
