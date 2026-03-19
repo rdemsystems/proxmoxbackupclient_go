@@ -89,7 +89,7 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	jobID := fmt.Sprintf("backup-%d", time.Now().Unix())
 
 	go func() {
-		writeDebugLog(fmt.Sprintf("Starting async backup: %s", jobID))
+		log.Printf("[API] Starting async backup: %s", jobID)
 		err := s.app.StartBackup(
 			req.BackupType,
 			req.BackupID,
@@ -98,9 +98,9 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 			req.UseVSS,
 		)
 		if err != nil {
-			writeDebugLog(fmt.Sprintf("Backup %s failed: %v", jobID, err))
+			log.Printf("[API] Backup %s failed: %v", jobID, err)
 		} else {
-			writeDebugLog(fmt.Sprintf("Backup %s completed successfully", jobID))
+			log.Printf("[API] Backup %s completed successfully", jobID)
 		}
 	}()
 
