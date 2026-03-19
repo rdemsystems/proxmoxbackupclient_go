@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.72 (2026-03-19)
+- **CRITICAL FIX**: Unified config location - service now has PBS config!
+- **FIX**: Config, scheduled_jobs, job_history now in C:\ProgramData\NimbusBackup\
+- **ROOT CAUSE**: Service had NO PBS config (different UserHomeDir)
+- **RESULT**: Backups will now actually reach PBS! 🎯
+
 ### v0.1.71 (2026-03-19)
 - **FIX**: Unified log location in C:\ProgramData\NimbusBackup\debug.log
 - **FEATURE**: GUI and Service now write to same log file (easy debugging!)
@@ -166,5 +172,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.71
+**Version actuelle:** 0.1.72
 **Dernière mise à jour:** 2026-03-19

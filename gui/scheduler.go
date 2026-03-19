@@ -43,13 +43,22 @@ type JobHistory struct {
 }
 
 func getScheduledJobsPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+	// Use ProgramData on Windows (shared between GUI and Service)
+	var configDir string
+
+	if programData := os.Getenv("ProgramData"); programData != "" {
+		// Windows: C:\ProgramData\NimbusBackup
+		configDir = filepath.Join(programData, "NimbusBackup")
+	} else {
+		// Unix-like: use ~/.proxmox-backup-guardian
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		configDir = filepath.Join(homeDir, ".proxmox-backup-guardian")
 	}
 
-	configDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", err
 	}
 
@@ -57,6 +66,30 @@ func getScheduledJobsPath() (string, error) {
 }
 
 func getJobHistoryPath() (string, error) {
+	// Use ProgramData on Windows (shared between GUI and Service)
+	var configDir string
+
+	if programData := os.Getenv("ProgramData"); programData != "" {
+		// Windows: C:\ProgramData\NimbusBackup
+		configDir = filepath.Join(programData, "NimbusBackup")
+	} else {
+		// Unix-like: use ~/.proxmox-backup-guardian
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		configDir = filepath.Join(homeDir, ".proxmox-backup-guardian")
+	}
+
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return "", err
+	}
+
+	return filepath.Join(configDir, "job_history.json"), nil
+}
+
+// Legacy function for compatibility - remove after migration
+func getJobHistoryPathLegacy() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err

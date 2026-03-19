@@ -34,13 +34,23 @@ type Config struct {
 }
 
 func getConfigPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+	// Use ProgramData on Windows (shared between GUI and Service)
+	// Fall back to user home on other platforms
+	var configDir string
+
+	if programData := os.Getenv("ProgramData"); programData != "" {
+		// Windows: C:\ProgramData\NimbusBackup (accessible by both user and LocalSystem)
+		configDir = filepath.Join(programData, "NimbusBackup")
+	} else {
+		// Unix-like: use ~/.proxmox-backup-guardian
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		configDir = filepath.Join(homeDir, ".proxmox-backup-guardian")
 	}
 
-	configDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", err
 	}
 
