@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -76,6 +77,10 @@ func init() {
 }
 
 func main() {
+	// Parse command line flags
+	minimized := flag.Bool("minimized", false, "Start minimized to system tray")
+	flag.Parse()
+
 	// Setup panic recovery for main
 	defer func() {
 		if r := recover(); r != nil {
@@ -115,6 +120,7 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		StartHidden:      *minimized, // Start hidden if --minimized flag is set
 		OnStartup:        app.startup,
 		OnDomReady:       app.domReady,
 		OnBeforeClose:    app.beforeClose,
@@ -128,6 +134,10 @@ func main() {
 			DisableWindowIcon:    false,
 			WebviewUserDataPath:  filepath.Join(os.Getenv("APPDATA"), "NimbusBackup"),
 		},
+	}
+
+	if *minimized {
+		writeDebugLog("Starting in minimized mode (hidden to tray)")
 	}
 
 	writeDebugLog("Application options configured")
@@ -209,6 +219,16 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	writeDebugLog("App.startup() called")
+
+	// Start background job scheduler
+	a.StartScheduler()
+	writeDebugLog("Background scheduler started")
+
+	// Execute startup jobs (jobs with runAtStartup=true)
+	go a.HandleStartupRun()
+
+	// Setup system tray for background operation
+	go a.SetupSystemTray()
 }
 
 // domReady is called after front-end resources have been loaded

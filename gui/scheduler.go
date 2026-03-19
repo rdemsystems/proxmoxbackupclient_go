@@ -1,198 +1,370 @@
 package main
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"time"
 )
 
-// Scheduler handles setting up scheduled tasks (cron on Linux, Task Scheduler on Windows)
-type Scheduler struct {
-	jobManager *JobManager
+// ScheduledJob represents a scheduled backup job
+type ScheduledJob struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	ScheduleTime string   `json:"scheduleTime"` // HH:MM format
+	RunAtStartup bool     `json:"runAtStartup"`
+	BackupDirs   []string `json:"backupDirs"`
+	BackupID     string   `json:"backupId"`
+	UseVSS       bool     `json:"useVSS"`
+	BackupType   string   `json:"backupType"`
+	ExcludeList  []string `json:"excludeList"`
+	LastRun      string   `json:"lastRun,omitempty"`  // ISO timestamp
+	NextRun      string   `json:"nextRun,omitempty"`  // ISO timestamp
+	Enabled      bool     `json:"enabled"`
 }
 
-func NewScheduler(jm *JobManager) *Scheduler {
-	return &Scheduler{
-		jobManager: jm,
-	}
+// JobHistory represents a completed backup job
+type JobHistory struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Timestamp  string   `json:"timestamp"` // ISO format
+	Status     string   `json:"status"`    // "success", "failed", "running"
+	Message    string   `json:"message"`
+	BackupDirs []string `json:"backupDirs"`
+	BackupID   string   `json:"backupId"`
+	UseVSS     bool     `json:"useVSS"`
 }
 
-// ScheduleJob creates a scheduled task for the given job
-func (s *Scheduler) ScheduleJob(job *Job) error {
-	if runtime.GOOS == "windows" {
-		return s.scheduleWindows(job)
-	}
-	return s.scheduleLinux(job)
-}
-
-// UnscheduleJob removes the scheduled task for the given job
-func (s *Scheduler) UnscheduleJob(job *Job) error {
-	if runtime.GOOS == "windows" {
-		return s.unscheduleWindows(job)
-	}
-	return s.unscheduleLinux(job)
-}
-
-// Linux/macOS: Use crontab
-func (s *Scheduler) scheduleLinux(job *Job) error {
-	// Get current crontab
-	currentCron, err := exec.Command("crontab", "-l").Output()
+func getScheduledJobsPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		// No crontab exists yet, that's okay
-		currentCron = []byte{}
+		return "", err
 	}
 
-	// Build cron line
-	// Get path to GUI binary
-	exePath, err := os.Executable()
-	if err != nil {
-		return err
+	configDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return "", err
 	}
 
-	// Export job config to temporary file
-	tmpDir := os.TempDir()
-	configPath := filepath.Join(tmpDir, fmt.Sprintf("pbs-job-%s.json", job.ID))
-	if err := job.ExportToJSON(configPath); err != nil {
-		return err
-	}
-
-	cronLine := fmt.Sprintf(
-		"%s %s run-job %s # PBS Job: %s\n",
-		job.ScheduleCron,
-		exePath,
-		job.ID,
-		job.Name,
-	)
-
-	// Append to crontab
-	newCron := string(currentCron) + cronLine
-
-	// Write new crontab
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = bytes.NewReader([]byte(newCron))
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to update crontab: %v", err)
-	}
-
-	return nil
+	return filepath.Join(configDir, "scheduled_jobs.json"), nil
 }
 
-func (s *Scheduler) unscheduleLinux(job *Job) error {
-	// Get current crontab
-	currentCron, err := exec.Command("crontab", "-l").Output()
+func getJobHistoryPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Remove lines containing job ID
-	lines := strings.Split(string(currentCron), "\n")
-	filteredLines := []string{}
-	for _, line := range lines {
-		if !strings.Contains(line, job.ID) {
-			filteredLines = append(filteredLines, line)
+	configDir := filepath.Join(homeDir, ".proxmox-backup-guardian")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return "", err
+	}
+
+	return filepath.Join(configDir, "job_history.json"), nil
+}
+
+// SaveScheduledJob saves a new scheduled job
+func (a *App) SaveScheduledJob(job ScheduledJob) error {
+	writeDebugLog(fmt.Sprintf("SaveScheduledJob called for: %s", job.Name))
+
+	// Load existing jobs
+	jobs, err := a.GetScheduledJobs()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Error loading existing jobs: %v", err))
+	}
+
+	// Set enabled by default
+	job.Enabled = true
+
+	// Calculate next run
+	job.NextRun = calculateNextRun(job.ScheduleTime)
+
+	// Add new job
+	jobs = append(jobs, job)
+
+	// Save to file
+	jobsPath, err := getScheduledJobsPath()
+	if err != nil {
+		return fmt.Errorf("failed to get jobs path: %w", err)
+	}
+
+	data, err := json.MarshalIndent(jobs, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal jobs: %w", err)
+	}
+
+	if err := os.WriteFile(jobsPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write jobs file: %w", err)
+	}
+
+	writeDebugLog(fmt.Sprintf("Scheduled job saved: %s (next run: %s)", job.Name, job.NextRun))
+
+	// If this job has runAtStartup enabled, ensure app auto-start is enabled
+	if job.RunAtStartup {
+		writeDebugLog("Job has runAtStartup=true, enabling system auto-start")
+		if err := a.EnableAutoStart(); err != nil {
+			writeDebugLog(fmt.Sprintf("Warning: Failed to enable auto-start: %v", err))
+			// Don't fail the whole operation if auto-start fails
 		}
 	}
 
-	// Write new crontab
-	newCron := strings.Join(filteredLines, "\n")
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = bytes.NewReader([]byte(newCron))
-	return cmd.Run()
+	return nil
 }
 
-// Windows: Use Task Scheduler (schtasks)
-func (s *Scheduler) scheduleWindows(job *Job) error {
-	// Get path to GUI binary
-	exePath, err := os.Executable()
+// GetScheduledJobs returns all scheduled jobs
+func (a *App) GetScheduledJobs() ([]ScheduledJob, error) {
+	jobsPath, err := getScheduledJobsPath()
+	if err != nil {
+		return []ScheduledJob{}, err
+	}
+
+	data, err := os.ReadFile(jobsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []ScheduledJob{}, nil // No jobs yet
+		}
+		return nil, err
+	}
+
+	var jobs []ScheduledJob
+	if err := json.Unmarshal(data, &jobs); err != nil {
+		return nil, err
+	}
+
+	return jobs, nil
+}
+
+// DeleteScheduledJob removes a scheduled job by ID
+func (a *App) DeleteScheduledJob(jobID string) error {
+	writeDebugLog(fmt.Sprintf("DeleteScheduledJob called for ID: %s", jobID))
+
+	jobs, err := a.GetScheduledJobs()
 	if err != nil {
 		return err
 	}
 
-	// Convert cron to Task Scheduler schedule
-	schedule := s.cronToWindowsSchedule(job.ScheduleCron)
-
-	// Create scheduled task
-	taskName := fmt.Sprintf("ProxmoxBackup_%s", job.ID)
-
-	cmd := exec.Command(
-		"schtasks",
-		"/Create",
-		"/TN", taskName,
-		"/TR", fmt.Sprintf(`"%s" run-job %s`, exePath, job.ID),
-		"/SC", schedule.Type,
-	)
-
-	// Add additional parameters based on schedule type
-	if schedule.Type == "DAILY" {
-		cmd.Args = append(cmd.Args, "/ST", schedule.StartTime)
-	} else if schedule.Type == "WEEKLY" {
-		cmd.Args = append(cmd.Args, "/D", schedule.DayOfWeek, "/ST", schedule.StartTime)
+	// Filter out the job to delete
+	filtered := []ScheduledJob{}
+	for _, job := range jobs {
+		if job.ID != jobID {
+			filtered = append(filtered, job)
+		}
 	}
 
-	cmd.Args = append(cmd.Args, "/F") // Force create/overwrite
-
-	output, err := cmd.CombinedOutput()
+	// Save updated list
+	jobsPath, err := getScheduledJobsPath()
 	if err != nil {
-		return fmt.Errorf("failed to create scheduled task: %v\nOutput: %s", err, output)
+		return err
 	}
 
-	return nil
-}
-
-func (s *Scheduler) unscheduleWindows(job *Job) error {
-	taskName := fmt.Sprintf("ProxmoxBackup_%s", job.ID)
-
-	cmd := exec.Command("schtasks", "/Delete", "/TN", taskName, "/F")
-	output, err := cmd.CombinedOutput()
+	data, err := json.MarshalIndent(filtered, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to delete scheduled task: %v\nOutput: %s", err, output)
+		return err
 	}
 
-	return nil
+	return os.WriteFile(jobsPath, data, 0600)
 }
 
-type WindowsSchedule struct {
-	Type      string // DAILY, WEEKLY, MONTHLY
-	StartTime string // HH:MM
-	DayOfWeek string // MON, TUE, etc.
+// GetJobHistory returns job history
+func (a *App) GetJobHistory() ([]JobHistory, error) {
+	historyPath, err := getJobHistoryPath()
+	if err != nil {
+		return []JobHistory{}, err
+	}
+
+	data, err := os.ReadFile(historyPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []JobHistory{}, nil
+		}
+		return nil, err
+	}
+
+	var history []JobHistory
+	if err := json.Unmarshal(data, &history); err != nil {
+		return nil, err
+	}
+
+	return history, nil
 }
 
-// Convert cron expression to Windows Task Scheduler format
-func (s *Scheduler) cronToWindowsSchedule(cronExpr string) WindowsSchedule {
-	// Simplified cron to Windows conversion
-	// Format: MIN HOUR DAY MONTH WEEKDAY
+// AddJobHistory adds a job to history
+func (a *App) AddJobHistory(entry JobHistory) error {
+	history, err := a.GetJobHistory()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Error loading history: %v", err))
+	}
 
-	// Common patterns:
-	// 0 2 * * * = Daily at 2:00
-	// 0 */6 * * * = Every 6 hours
-	// 0 2 * * 0 = Weekly on Sunday at 2:00
+	// Add new entry at the beginning
+	history = append([]JobHistory{entry}, history...)
 
-	// Default to daily at 2:00 AM
-	return WindowsSchedule{
-		Type:      "DAILY",
-		StartTime: "02:00",
+	// Keep only last 50 entries
+	if len(history) > 50 {
+		history = history[:50]
+	}
+
+	// Save
+	historyPath, err := getJobHistoryPath()
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(historyPath, data, 0600)
+}
+
+// calculateNextRun calculates the next run time based on schedule time (HH:MM)
+func calculateNextRun(scheduleTime string) string {
+	parts := strings.Split(scheduleTime, ":")
+	if len(parts) != 2 {
+		return ""
+	}
+
+	now := time.Now()
+	var hour, min int
+	fmt.Sscanf(scheduleTime, "%d:%d", &hour, &min)
+
+	// Schedule for today at the specified time
+	nextRun := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location())
+
+	// If time has already passed today, schedule for tomorrow
+	if nextRun.Before(now) {
+		nextRun = nextRun.Add(24 * time.Hour)
+	}
+
+	return nextRun.Format(time.RFC3339)
+}
+
+// StartScheduler starts the background job scheduler
+func (a *App) StartScheduler() {
+	writeDebugLog("Starting background job scheduler")
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			a.checkAndRunScheduledJobs()
+		}
+	}()
+}
+
+// checkAndRunScheduledJobs checks if any jobs need to run
+func (a *App) checkAndRunScheduledJobs() {
+	jobs, err := a.GetScheduledJobs()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Error loading scheduled jobs: %v", err))
+		return
+	}
+
+	now := time.Now()
+
+	for _, job := range jobs {
+		if !job.Enabled {
+			continue
+		}
+
+		// Parse next run time
+		if job.NextRun == "" {
+			continue
+		}
+
+		nextRun, err := time.Parse(time.RFC3339, job.NextRun)
+		if err != nil {
+			writeDebugLog(fmt.Sprintf("Error parsing next run time: %v", err))
+			continue
+		}
+
+		// Check if it's time to run (within 2 minute window to avoid missing)
+		if now.After(nextRun) && now.Before(nextRun.Add(2*time.Minute)) {
+			writeDebugLog(fmt.Sprintf("Executing scheduled job: %s", job.Name))
+			go a.executeScheduledJob(job)
+		}
 	}
 }
 
-// GetCronExpression converts schedule preset to cron expression
-func GetCronExpression(preset string) string {
-	switch preset {
-	case "Toutes les heures":
-		return "0 * * * *"
-	case "Toutes les 6 heures":
-		return "0 */6 * * *"
-	case "Quotidien (2h du matin)":
-		return "0 2 * * *"
-	case "Hebdomadaire (Dimanche 2h)":
-		return "0 2 * * 0"
-	case "Mensuel (1er jour du mois)":
-		return "0 2 1 * *"
-	default:
-		return "0 2 * * *" // Default daily at 2am
+// executeScheduledJob executes a scheduled job
+func (a *App) executeScheduledJob(job ScheduledJob) {
+	writeDebugLog(fmt.Sprintf("Executing scheduled job: %s", job.Name))
+
+	// Add to history as "running"
+	historyEntry := JobHistory{
+		ID:         fmt.Sprintf("%d", time.Now().Unix()),
+		Name:       job.Name,
+		Timestamp:  time.Now().Format(time.RFC3339),
+		Status:     "running",
+		Message:    "Backup en cours...",
+		BackupDirs: job.BackupDirs,
+		BackupID:   job.BackupID,
+		UseVSS:     job.UseVSS,
 	}
+	a.AddJobHistory(historyEntry)
+
+	// Map frontend BackupType to PBS BackupType
+	pbsBackupType := "host" // Default for directory backups
+	if job.BackupType == "machine" {
+		pbsBackupType = "vm"
+	}
+
+	// Execute backup using RunBackupInline
+	opts := BackupOptions{
+		BaseURL:         a.config.BaseURL,
+		AuthID:          a.config.AuthID,
+		Secret:          a.config.Secret,
+		Datastore:       a.config.Datastore,
+		Namespace:       a.config.Namespace,
+		CertFingerprint: a.config.CertFingerprint,
+		BackupDirs:      job.BackupDirs,
+		BackupID:        job.BackupID,
+		BackupType:      pbsBackupType,
+		UseVSS:          job.UseVSS,
+		OnProgress: func(percent float64, message string) {
+			// Log progress for scheduled backups
+			writeDebugLog(fmt.Sprintf("Scheduled backup progress: %.1f%% - %s", percent, message))
+		},
+		OnComplete: func(success bool, message string) {
+			// Update history entry
+			historyEntry.Status = "success"
+			historyEntry.Message = message
+			if !success {
+				historyEntry.Status = "failed"
+			}
+			historyEntry.Timestamp = time.Now().Format(time.RFC3339)
+			a.AddJobHistory(historyEntry)
+
+			writeDebugLog(fmt.Sprintf("Scheduled job completed: %s - success=%v", job.Name, success))
+		},
+	}
+
+	// Run the backup
+	err := RunBackupInline(opts)
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Scheduled job error: %v", err))
+		historyEntry.Status = "failed"
+		historyEntry.Message = fmt.Sprintf("Erreur: %v", err)
+		historyEntry.Timestamp = time.Now().Format(time.RFC3339)
+		a.AddJobHistory(historyEntry)
+	}
+
+	// Update job's last run and calculate next run
+	jobs, _ := a.GetScheduledJobs()
+	for i, j := range jobs {
+		if j.ID == job.ID {
+			jobs[i].LastRun = time.Now().Format(time.RFC3339)
+			jobs[i].NextRun = calculateNextRun(job.ScheduleTime)
+			break
+		}
+	}
+
+	// Save updated jobs
+	jobsPath, _ := getScheduledJobsPath()
+	data, _ := json.MarshalIndent(jobs, "", "  ")
+	os.WriteFile(jobsPath, data, 0600)
 }
 

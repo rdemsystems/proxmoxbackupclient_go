@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 
 // Wails runtime imports (will be available when built with Wails)
 let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, ListPhysicalDisks, GetVersion, EventsOn
+let SaveScheduledJob, GetScheduledJobs, DeleteScheduledJob, GetJobHistory
+let EnableAutoStart, DisableAutoStart, IsAutoStartEnabled
 
 // Check if we're running in Wails
 if (window.go) {
@@ -13,6 +15,13 @@ if (window.go) {
   RestoreSnapshot = window.go.main.App.RestoreSnapshot
   ListPhysicalDisks = window.go.main.App.ListPhysicalDisks
   GetVersion = window.go.main.App.GetVersion
+  SaveScheduledJob = window.go.main.App.SaveScheduledJob
+  GetScheduledJobs = window.go.main.App.GetScheduledJobs
+  DeleteScheduledJob = window.go.main.App.DeleteScheduledJob
+  GetJobHistory = window.go.main.App.GetJobHistory
+  EnableAutoStart = window.go.main.App.EnableAutoStart
+  DisableAutoStart = window.go.main.App.DisableAutoStart
+  IsAutoStartEnabled = window.go.main.App.IsAutoStartEnabled
 }
 
 // Wails events
@@ -42,6 +51,13 @@ function App() {
   const [physicalDisks, setPhysicalDisks] = useState([])
   const [excludeList, setExcludeList] = useState('')
   const [progress, setProgress] = useState(0)
+
+  // Scheduling states
+  const [backupMode, setBackupMode] = useState('oneshot') // 'oneshot' or 'scheduled'
+  const [scheduleTime, setScheduleTime] = useState('02:00')
+  const [runAtStartup, setRunAtStartup] = useState(false)
+  const [scheduledJobs, setScheduledJobs] = useState([])
+  const [jobHistory, setJobHistory] = useState([])
   const [backupStats, setBackupStats] = useState({
     startTime: null,
     lastUpdate: null,
@@ -123,6 +139,19 @@ function App() {
       setProgress(data.success ? 100 : 0)
       setBackupStats({ startTime: null, lastUpdate: null, lastPercent: 0, speed: 0, eta: null })
       showStatus(data.success ? '✅ ' + data.message : '❌ ' + data.message, data.success ? 'success' : 'error')
+
+      // Add to job history
+      const historyEntry = {
+        id: Date.now().toString(),
+        name: `Backup ${config['backup-id'] || hostname}`,
+        timestamp: new Date().toISOString(),
+        status: data.success ? 'success' : 'failed',
+        message: data.message,
+        backupDirs: backupDirs.split('\n').map(d => d.trim()).filter(d => d),
+        backupId: config['backup-id'] || hostname,
+        useVSS: config.usevss
+      }
+      setJobHistory(prev => [historyEntry, ...prev].slice(0, 20)) // Keep last 20 entries
     })
 
     return () => {
@@ -173,6 +202,27 @@ function App() {
     }
 
     loadData()
+  }, [])
+
+  // Load scheduled jobs and history on mount
+  useEffect(() => {
+    const loadSchedulerData = async () => {
+      try {
+        if (GetScheduledJobs) {
+          const jobs = await GetScheduledJobs()
+          setScheduledJobs(jobs || [])
+        }
+
+        if (GetJobHistory) {
+          const history = await GetJobHistory()
+          setJobHistory(history || [])
+        }
+      } catch (err) {
+        console.error('Failed to load scheduler data:', err)
+      }
+    }
+
+    loadSchedulerData()
   }, [])
 
   const showStatus = (message, type) => {
@@ -259,6 +309,37 @@ function App() {
       return
     }
 
+    // Scheduled mode - save job instead of executing immediately
+    if (backupMode === 'scheduled') {
+      if (!SaveScheduledJob) {
+        showStatus('❌ Fonction de planification non disponible', 'error')
+        return
+      }
+
+      const newJob = {
+        id: Date.now().toString(),
+        name: `Backup ${config['backup-id'] || hostname}`,
+        scheduleTime: scheduleTime,
+        runAtStartup: runAtStartup,
+        backupDirs: dirList,
+        backupId: config['backup-id'],
+        useVSS: config.usevss,
+        backupType: backupType,
+        excludeList: excludeList.split('\n').filter(l => l.trim())
+      }
+
+      // Save to backend
+      try {
+        await SaveScheduledJob(newJob)
+        setScheduledJobs([...scheduledJobs, newJob])
+        showStatus(`✅ Backup planifié pour ${scheduleTime}`, 'success')
+      } catch (err) {
+        showStatus(`❌ Erreur: ${err}`, 'error')
+      }
+      return
+    }
+
+    // One-shot mode - execute immediately
     showStatus('🚀 Démarrage de la sauvegarde...', 'info')
     setProgress(5)
 
@@ -481,6 +562,77 @@ function App() {
             </select>
           </div>
 
+          {/* Backup Mode Toggle */}
+          <div className="form-group">
+            <label>Mode d'exécution</label>
+            <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
+              <button
+                onClick={() => setBackupMode('oneshot')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  backgroundColor: backupMode === 'oneshot' ? '#667eea' : '#e2e8f0',
+                  color: backupMode === 'oneshot' ? 'white' : '#4a5568',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                ⚡ One-shot (maintenant)
+              </button>
+              <button
+                onClick={() => setBackupMode('scheduled')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  backgroundColor: backupMode === 'scheduled' ? '#667eea' : '#e2e8f0',
+                  color: backupMode === 'scheduled' ? 'white' : '#4a5568',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                📅 Planifié
+              </button>
+            </div>
+          </div>
+
+          {/* Scheduling Options */}
+          {backupMode === 'scheduled' && (
+            <div className="card" style={{marginTop: '20px', padding: '20px'}}>
+              <h3 style={{marginTop: 0}}>⏰ Configuration de la planification</h3>
+
+              <div className="form-group">
+                <label>Heure d'exécution quotidienne</label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  style={{width: '200px', padding: '10px', fontSize: '16px'}}
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer'}}>
+                  <input
+                    type="checkbox"
+                    checked={runAtStartup}
+                    onChange={(e) => setRunAtStartup(e.target.checked)}
+                    style={{width: '20px', height: '20px', cursor: 'pointer'}}
+                  />
+                  <span>🚀 Exécuter aussi au démarrage de la machine</span>
+                </label>
+              </div>
+
+              <div className="info-box" style={{backgroundColor: '#eef2ff'}}>
+                💡 Le backup sera exécuté automatiquement chaque jour à <strong>{scheduleTime}</strong>
+                {runAtStartup && <><br/>Et également à chaque démarrage du système.</>}
+              </div>
+            </div>
+          )}
+
           {backupType === 'directory' ? (
             <div className="form-group">
               <label>Répertoires à sauvegarder (un par ligne)</label>
@@ -614,9 +766,111 @@ function App() {
           )}
 
           <button className="btn" onClick={handleStartBackup} disabled={progress > 0 && progress < 100}>
-            {progress > 0 && progress < 100 ? '⏳ Sauvegarde en cours...' : '🚀 Démarrer la sauvegarde'}
+            {backupMode === 'oneshot'
+              ? (progress > 0 && progress < 100 ? '⏳ Sauvegarde en cours...' : '🚀 Démarrer la sauvegarde')
+              : '💾 Enregistrer la planification'
+            }
           </button>
-          <button className="btn btn-secondary" onClick={() => setProgress(0)} disabled={progress === 0}>Arrêter</button>
+          {backupMode === 'oneshot' && (
+            <button className="btn btn-secondary" onClick={() => setProgress(0)} disabled={progress === 0}>Arrêter</button>
+          )}
+
+          {/* Scheduled Jobs List */}
+          {backupMode === 'scheduled' && scheduledJobs.length > 0 && (
+            <div className="card" style={{marginTop: '30px'}}>
+              <h3 style={{marginTop: 0}}>📅 Jobs planifiés</h3>
+              {scheduledJobs.map(job => (
+                <div key={job.id} style={{
+                  padding: '15px',
+                  marginBottom: '10px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  border: '1px solid #dee2e6'
+                }}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <div>
+                      <strong>{job.name}</strong>
+                      <div style={{fontSize: '14px', color: '#6c757d', marginTop: '5px'}}>
+                        ⏰ {job.scheduleTime} {job.runAtStartup && '• 🚀 Au démarrage'}
+                      </div>
+                      <div style={{fontSize: '13px', color: '#6c757d', marginTop: '3px'}}>
+                        📁 {job.backupDirs.join(', ')}
+                      </div>
+                    </div>
+                    <div style={{display: 'flex', gap: '10px'}}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{padding: '8px 15px', fontSize: '14px'}}
+                        onClick={async () => {
+                          try {
+                            await DeleteScheduledJob(job.id)
+                            setScheduledJobs(scheduledJobs.filter(j => j.id !== job.id))
+                            showStatus('Job supprimé', 'success')
+                          } catch (err) {
+                            showStatus(`❌ Erreur: ${err}`, 'error')
+                          }
+                        }}
+                      >
+                        🗑️ Supprimer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Job History */}
+          {jobHistory.length > 0 && (
+            <div className="card" style={{marginTop: '30px'}}>
+              <h3 style={{marginTop: 0}}>📜 Historique des sauvegardes</h3>
+              <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                {jobHistory.map(job => (
+                  <div key={job.id} style={{
+                    padding: '15px',
+                    marginBottom: '10px',
+                    backgroundColor: job.status === 'success' ? '#d4edda' : job.status === 'failed' ? '#f8d7da' : '#fff3cd',
+                    borderRadius: '8px',
+                    border: `1px solid ${job.status === 'success' ? '#c3e6cb' : job.status === 'failed' ? '#f5c6cb' : '#ffeaa7'}`
+                  }}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <div style={{flex: 1}}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                          <span style={{fontSize: '20px'}}>
+                            {job.status === 'success' ? '✅' : job.status === 'failed' ? '❌' : '⏳'}
+                          </span>
+                          <strong>{job.name}</strong>
+                        </div>
+                        <div style={{fontSize: '13px', color: '#6c757d', marginTop: '5px', marginLeft: '30px'}}>
+                          🕐 {new Date(job.timestamp).toLocaleString('fr-FR')}
+                        </div>
+                        {job.message && (
+                          <div style={{fontSize: '13px', color: '#495057', marginTop: '5px', marginLeft: '30px'}}>
+                            💬 {job.message}
+                          </div>
+                        )}
+                      </div>
+                      {job.status === 'failed' && (
+                        <button
+                          className="btn"
+                          style={{padding: '8px 15px', fontSize: '14px'}}
+                          onClick={() => {
+                            // Re-run failed job
+                            setBackupDirs(job.backupDirs.join('\n'))
+                            setConfig({...config, 'backup-id': job.backupId, usevss: job.useVSS})
+                            showStatus('Configuration chargée, lancez le backup', 'success')
+                            window.scrollTo({top: 0, behavior: 'smooth'})
+                          }}
+                        >
+                          🔄 Relancer
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {status.visible && activeTab === 'backup' && (
             <div className={`status ${status.type} visible`}>{status.message}</div>
