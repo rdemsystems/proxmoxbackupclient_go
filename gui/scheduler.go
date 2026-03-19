@@ -228,7 +228,10 @@ func calculateNextRun(scheduleTime string) string {
 
 	now := time.Now()
 	var hour, min int
-	fmt.Sscanf(scheduleTime, "%d:%d", &hour, &min)
+	if _, err := fmt.Sscanf(scheduleTime, "%d:%d", &hour, &min); err != nil {
+		writeDebugLog(fmt.Sprintf("Error parsing schedule time %s: %v", scheduleTime, err))
+		return ""
+	}
 
 	// Schedule for today at the specified time
 	nextRun := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location())
@@ -324,7 +327,9 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 		BackupID:   job.BackupID,
 		UseVSS:     job.UseVSS,
 	}
-	a.AddJobHistory(historyEntry)
+	if err := a.AddJobHistory(historyEntry); err != nil {
+		writeDebugLog(fmt.Sprintf("Warning: Failed to add job history: %v", err))
+	}
 
 	// Map frontend BackupType to PBS BackupType
 	pbsBackupType := "host" // Default for directory backups
@@ -356,7 +361,9 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 				historyEntry.Status = "failed"
 			}
 			historyEntry.Timestamp = time.Now().Format(time.RFC3339)
-			a.AddJobHistory(historyEntry)
+			if err := a.AddJobHistory(historyEntry); err != nil {
+				writeDebugLog(fmt.Sprintf("Warning: Failed to add job history: %v", err))
+			}
 
 			writeDebugLog(fmt.Sprintf("Scheduled job completed: %s - success=%v", job.Name, success))
 		},
@@ -369,7 +376,9 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 		historyEntry.Status = "failed"
 		historyEntry.Message = fmt.Sprintf("Erreur: %v", err)
 		historyEntry.Timestamp = time.Now().Format(time.RFC3339)
-		a.AddJobHistory(historyEntry)
+		if err := a.AddJobHistory(historyEntry); err != nil {
+			writeDebugLog(fmt.Sprintf("Warning: Failed to add job history: %v", err))
+		}
 	}
 
 	// Update job's last run and calculate next run
@@ -385,6 +394,8 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 	// Save updated jobs
 	jobsPath, _ := getScheduledJobsPath()
 	data, _ := json.MarshalIndent(jobs, "", "  ")
-	os.WriteFile(jobsPath, data, 0600)
+	if err := os.WriteFile(jobsPath, data, 0600); err != nil {
+		writeDebugLog(fmt.Sprintf("Warning: Failed to save updated jobs: %v", err))
+	}
 }
 
