@@ -79,6 +79,10 @@
 
 ## 📜 Changelog récent
 
+### v0.1.46 (2026-03-19)
+- **FIX**: Update gui/go.mod to Go 1.23 (required for kardianos/service)
+- **FIX**: Specify go 1.23.0 in go.work for exact version match
+
 ### v0.1.45 (2026-03-19)
 - **FIX**: Upgrade CI to Go 1.23 for kardianos/service compatibility
 - **FIX**: Update go.work to require Go 1.23
@@ -112,5 +116,5 @@
 
 ---
 
-**Version actuelle:** 0.1.45
+**Version actuelle:** 0.1.46
 **Dernière mise à jour:** 2026-03-19
