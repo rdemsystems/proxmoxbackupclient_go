@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <?define ProductName = "Nimbus Backup" ?>
-  <?define ProductVersion = "0.1.57" ?>
+  <?define ProductVersion = "0.1.58" ?>
   <?define Manufacturer = "RDEM Systems" ?>
   <?define UpgradeCode = "12345678-1234-1234-1234-123456789012" ?>
 

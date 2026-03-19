@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.58 (2026-03-19)
+- **FEAT**: GPL v3 license added to MSI installer (upstream compliance)
+- **FIX**: Service no longer starts during installation (prevents hang)
+- **LICENSE**: Proper GPL v3 License.rtf displayed in installer
+
 ### v0.1.57 (2026-03-19)
 - **FIX**: MSI ICE80 error - add Platform="x64" declaration
 - **BUILD**: Proper 64-bit installer configuration for WiX
@@ -173,5 +178,5 @@
 
 ---
 
-**Version actuelle:** 0.1.57
+**Version actuelle:** 0.1.58
 **Dernière mise à jour:** 2026-03-19
