@@ -79,6 +79,10 @@
 
 ## 📜 Changelog récent
 
+### v0.1.67 (2026-03-19)
+- **FIX**: Lint error S1000 - use for range instead of for-select
+- **QUALITY**: Clean code pattern in pollBackupProgress
+
 ### v0.1.66 (2026-03-19)
 - **FIX**: Service now executes backups in ModeStandalone (VSS with admin rights)
 - **FIX**: Service App initialization sets mode explicitly to prevent routing loop
@@ -143,5 +147,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.66
+**Version actuelle:** 0.1.67
 **Dernière mise à jour:** 2026-03-19
