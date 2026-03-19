@@ -135,26 +135,58 @@
   - [ ] Erreur propre: "Fichier X verrouillé, activer VSS?"
 
 ### Multi-Serveurs PBS (Phase 2)
-- [ ] **Configuration multiple**
-  - [ ] Support N serveurs PBS dans config.json:
-    ```json
-    "pbs_servers": [
-      {"name": "PBS Primary", "url": "...", "token": "...", "priority": 1},
-      {"name": "PBS Backup", "url": "...", "token": "...", "priority": 2}
-    ]
-    ```
-  - [ ] Sélection serveur par job (dropdown dans GUI)
-  - [ ] Serveur par défaut configurable
+**Architecture: 1 job = 1 serveur (multi-jobs = multi-serveurs)**
 
-- [ ] **Redondance/Failover**
-  - [ ] Option "Backup vers serveurs multiples" (copie sur N destinations)
-  - [ ] Failover automatique si serveur primaire down
-  - [ ] Status: afficher quel serveur est utilisé
+- [ ] **Config: Liste de serveurs disponibles**
+  ```json
+  "pbs_servers": [
+    {
+      "id": "pbs-local",
+      "name": "PBS Local (Rapide)",
+      "url": "https://pbs.local:8007",
+      "auth_id": "backup@pbs",
+      "secret": "xxx",
+      "datastore": "backup"
+    },
+    {
+      "id": "pbs-cloud",
+      "name": "PBS Cloud (Archive)",
+      "url": "https://pbs.cloud:8007",
+      "auth_id": "backup@pbs",
+      "secret": "yyy",
+      "datastore": "archive"
+    }
+  ]
+  ```
 
-- [ ] **Use Cases**
-  - [ ] PBS local (rapide) + PBS cloud (archivage)
-  - [ ] PBS prod + PBS dev/test
-  - [ ] Geo-redundancy (site A + site B)
+- [ ] **Job: Sélection du serveur**
+  ```json
+  "jobs": [
+    {
+      "name": "Tous les users",
+      "paths": ["C:\\Users"],
+      "server_id": "pbs-local",
+      "schedule": "daily 02:00"
+    },
+    {
+      "name": "Documents importants",
+      "paths": ["C:\\Users\\richard\\documents"],
+      "server_id": "pbs-cloud",
+      "schedule": "hourly"
+    }
+  ]
+  ```
+
+- [ ] **GUI**
+  - [ ] Gestion serveurs: liste, ajouter, éditer, supprimer
+  - [ ] Job config: dropdown "Serveur PBS" (liste les serveurs)
+  - [ ] Test connexion par serveur (bouton "Tester")
+  - [ ] Badge couleur: 🟢 online / 🔴 offline
+
+- [ ] **Use Cases réels**
+  - Backup quotidien gros volumes → PBS local (rapide)
+  - Backup horaire données critiques → PBS cloud (redondance)
+  - Backup dev/test → PBS dev, backup prod → PBS prod
 
 ### Chiffrement (Phase 3)
 - [ ] **Key Management**
