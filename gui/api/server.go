@@ -64,7 +64,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := StatusResponse{
 		Running:       true,
-		Version:       "0.1.68", // TODO: get from build
+		Version:       "0.1.69", // TODO: get from build
 		ActiveJobs:    0,         // TODO: track active jobs
 		Configuration: config,
 	}
@@ -102,6 +102,7 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		Message:   "Starting backup...",
 		StartTime: time.Now().Format(time.RFC3339),
 	}
+	log.Printf("[API] Progress entry created for %s (total entries: %d)", jobID, len(s.backupProgress))
 	s.progressMutex.Unlock()
 
 	go func() {
@@ -164,9 +165,21 @@ func (s *Server) handleBackupStatus(w http.ResponseWriter, r *http.Request) {
 
 	s.progressMutex.RLock()
 	progress, exists := s.backupProgress[jobID]
+	totalJobs := len(s.backupProgress)
 	s.progressMutex.RUnlock()
 
+	log.Printf("[API] Progress query for %s: exists=%v, total_jobs=%d", jobID, exists, totalJobs)
+
 	if !exists {
+		log.Printf("[API] Available job IDs: %v", func() []string {
+			s.progressMutex.RLock()
+			defer s.progressMutex.RUnlock()
+			ids := make([]string, 0, len(s.backupProgress))
+			for id := range s.backupProgress {
+				ids = append(ids, id)
+			}
+			return ids
+		}())
 		s.writeError(w, "Job not found", http.StatusNotFound)
 		return
 	}

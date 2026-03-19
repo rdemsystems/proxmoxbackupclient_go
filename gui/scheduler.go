@@ -476,63 +476,38 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 		pbsBackupType = "vm"
 	}
 
-	// Execute backup using RunBackupInline
-	opts := BackupOptions{
-		BaseURL:         a.config.BaseURL,
-		AuthID:          a.config.AuthID,
-		Secret:          a.config.Secret,
-		Datastore:       a.config.Datastore,
-		Namespace:       a.config.Namespace,
-		CertFingerprint: a.config.CertFingerprint,
-		BackupDirs:      job.BackupDirs,
-		BackupID:        job.BackupID,
-		BackupType:      pbsBackupType,
-		UseVSS:          job.UseVSS,
-		OnProgress: func(percent float64, message string) {
-			// Log progress for scheduled backups
-			writeDebugLog(fmt.Sprintf("Scheduled backup progress: %.1f%% - %s", percent, message))
-		},
-		OnComplete: func(success bool, message string) {
-			// Create history entry with final status
-			historyEntry := JobHistory{
-				ID:         fmt.Sprintf("%d", startTime.Unix()),
-				Name:       job.Name,
-				Timestamp:  time.Now().Format(time.RFC3339),
-				Status:     "success",
-				Message:    message,
-				BackupDirs: job.BackupDirs,
-				BackupID:   job.BackupID,
-				UseVSS:     job.UseVSS,
-			}
-			if !success {
-				historyEntry.Status = "failed"
-			}
-			if err := a.AddJobHistory(historyEntry); err != nil {
-				writeDebugLog(fmt.Sprintf("Warning: Failed to add job history: %v", err))
-			}
+	// Use StartBackup to route through mode detection (service or direct)
+	writeDebugLog(fmt.Sprintf("[Scheduled Job] Executing via StartBackup (mode: %s)", a.mode.String()))
 
-			writeDebugLog(fmt.Sprintf("Scheduled job completed: %s - success=%v", job.Name, success))
-		},
+	err := a.StartBackup(
+		job.BackupType,
+		job.BackupDirs,
+		[]string{}, // driveLetters - empty for directory backups
+		job.ExcludeList,
+		job.BackupID,
+		job.UseVSS,
+	)
+
+	// Add history entry
+	historyEntry := JobHistory{
+		ID:         fmt.Sprintf("%d", startTime.Unix()),
+		Name:       job.Name,
+		Timestamp:  time.Now().Format(time.RFC3339),
+		Status:     "success",
+		Message:    "Backup started",
+		BackupDirs: job.BackupDirs,
+		BackupID:   job.BackupID,
+		UseVSS:     job.UseVSS,
 	}
 
-	// Run the backup
-	err := RunBackupInline(opts)
 	if err != nil {
 		writeDebugLog(fmt.Sprintf("Scheduled job error: %v", err))
-		// Add error to history (OnComplete might not be called on error)
-		historyEntry := JobHistory{
-			ID:         fmt.Sprintf("%d", startTime.Unix()),
-			Name:       job.Name,
-			Timestamp:  time.Now().Format(time.RFC3339),
-			Status:     "failed",
-			Message:    fmt.Sprintf("Erreur: %v", err),
-			BackupDirs: job.BackupDirs,
-			BackupID:   job.BackupID,
-			UseVSS:     job.UseVSS,
-		}
-		if err := a.AddJobHistory(historyEntry); err != nil {
-			writeDebugLog(fmt.Sprintf("Warning: Failed to add job history: %v", err))
-		}
+		historyEntry.Status = "failed"
+		historyEntry.Message = fmt.Sprintf("Erreur: %v", err)
+	}
+
+	if err := a.AddJobHistory(historyEntry); err != nil {
+		writeDebugLog(fmt.Sprintf("Warning: Failed to add job history: %v", err))
 	}
 
 	// Update job's last run and calculate next run

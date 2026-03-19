@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.69 (2026-03-19)
+- **FIX**: Scheduled jobs now use StartBackup (routes via service if available)
+- **FIX**: Scheduler no longer bypasses mode detection
+- **DEBUG**: Enhanced progress tracking logs (jobID lookup, map size)
+- **QUALITY**: Scheduled jobs execute with admin rights when service runs them
+
 ### v0.1.68 (2026-03-19)
 - **FIX**: Service stop mechanism with stopChan (proper shutdown during upgrades)
 - **FIX**: Replace infinite sleep loop with channel-based blocking
@@ -152,5 +158,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.68
+**Version actuelle:** 0.1.69
 **Dernière mise à jour:** 2026-03-19
