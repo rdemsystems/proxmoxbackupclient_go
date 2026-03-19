@@ -79,6 +79,10 @@
 
 ## 📜 Changelog récent
 
+### v0.1.60 (2026-03-19)
+- **FIX**: Compilation error - use standard log package in API
+- **QUALITY**: CI tests now pass (writeDebugLog undefined resolved)
+
 ### v0.1.59 (2026-03-19)
 - **FEAT**: HTTP API architecture for GUI-Service communication (async backups)
 - **FEAT**: Hybrid mode detection (Service/Standalone with auto-fallback)
@@ -100,5 +104,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.59
+**Version actuelle:** 0.1.60
 **Dernière mise à jour:** 2026-03-19
