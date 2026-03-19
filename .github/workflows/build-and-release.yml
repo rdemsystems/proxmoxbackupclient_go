@@ -164,11 +164,28 @@ jobs:
           Copy-Item gui/build/bin/NimbusBackup.exe dist/
         shell: pwsh
 
-      - name: Upload GUI artifact
+      - name: Install WiX Toolset
+        run: |
+          choco install wixtoolset -y
+          $env:PATH += ";C:\Program Files (x86)\WiX Toolset v3.14\bin"
+          echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Build MSI Installer
+        working-directory: installer/wix
+        run: |
+          candle.exe Product.wxs -ext WixUIExtension -ext WixUtilExtension
+          light.exe Product.wixobj -ext WixUIExtension -ext WixUtilExtension -out NimbusBackup.msi
+          Copy-Item NimbusBackup.msi ../../dist/
+        shell: pwsh
+
+      - name: Upload GUI artifacts
         uses: actions/upload-artifact@v4
         with:
           name: NimbusBackup-Windows
-          path: dist/NimbusBackup.exe
+          path: |
+            dist/NimbusBackup.exe
+            dist/NimbusBackup.msi
 
   # Create release on tag
   release:
@@ -207,10 +224,12 @@ jobs:
           cd artifacts/cli-macOS && tar -czf ../../release/nimbus-backup-cli-${{ steps.version.outputs.VERSION }}-macos.tar.gz *
           cd ../..
 
-          # GUI Windows - Add both .exe (with and without version) and .zip
+          # GUI Windows - Add .exe, .msi (with and without version) and .zip
           cd artifacts/NimbusBackup-Windows
           cp NimbusBackup.exe ../../release/NimbusBackup-${{ steps.version.outputs.VERSION }}.exe
           cp NimbusBackup.exe ../../release/NimbusBackup.exe
+          cp NimbusBackup.msi ../../release/NimbusBackup-${{ steps.version.outputs.VERSION }}.msi
+          cp NimbusBackup.msi ../../release/NimbusBackup.msi
           zip ../../release/NimbusBackup-${{ steps.version.outputs.VERSION }}-windows.zip *
           cd ../..
 
