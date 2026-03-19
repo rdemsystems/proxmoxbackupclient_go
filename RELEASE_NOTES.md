@@ -79,6 +79,10 @@
 
 ## 📜 Changelog récent
 
+### v0.1.47 (2026-03-19)
+- **FIX**: Correct GetConfigWithHostname() call signature in service.go
+- **FIX**: Simplify service config loading (loaded per-job when needed)
+
 ### v0.1.46 (2026-03-19)
 - **FIX**: Update gui/go.mod to Go 1.23 (required for kardianos/service)
 - **FIX**: Specify go 1.23.0 in go.work for exact version match
@@ -116,5 +120,5 @@
 
 ---
 
-**Version actuelle:** 0.1.46
+**Version actuelle:** 0.1.47
 **Dernière mise à jour:** 2026-03-19
