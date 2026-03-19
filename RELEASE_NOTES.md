@@ -79,6 +79,13 @@
 
 ## 📜 Changelog récent
 
+### v0.1.79 (2026-03-19)
+- **CRITICAL FIX**: VSS admin check now only in standalone mode (not when using service)
+- **FIX**: Service can now use VSS without GUI being admin
+- **FEATURE**: GetSystemInfo() API for mode/admin status detection
+- **FEATURE**: DiagnoseConfig() API for debugging config issues
+- **DEBUG**: Enhanced logging in SaveConfig to track save failures
+
 ### v0.1.78 (2026-03-19)
 - **CRITICAL FIX**: Service logs accessible even if %ProgramData% env var missing
 - **FIX**: Hardcoded fallback to C:\ProgramData\NimbusBackup on Windows
@@ -202,5 +209,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.78
+**Version actuelle:** 0.1.79
 **Dernière mise à jour:** 2026-03-19

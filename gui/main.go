@@ -314,6 +314,16 @@ func (a *App) GetHostname() string {
 	return hostname
 }
 
+// GetSystemInfo returns system information for UI (mode, admin status, etc.)
+func (a *App) GetSystemInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"mode":     a.mode.String(),
+		"is_admin": isAdmin(),
+		"hostname": a.GetHostname(),
+		"service_available": a.mode == api.ModeService,
+	}
+}
+
 func (a *App) GetVersion() string {
 	writeDebugLog(fmt.Sprintf("GetVersion() returned: %s", appVersion))
 	return appVersion
@@ -360,6 +370,29 @@ func (a *App) GetConfigWithHostname() map[string]interface{} {
 	return result
 }
 
+// DiagnoseConfig returns config validation status for debugging
+func (a *App) DiagnoseConfig() map[string]interface{} {
+	cfg := a.GetConfig()
+
+	var validationError string
+	if err := cfg.Validate(); err != nil {
+		validationError = err.Error()
+	}
+
+	configPath, _ := getConfigPath()
+
+	return map[string]interface{}{
+		"config_path":       configPath,
+		"baseurl_set":       cfg.BaseURL != "",
+		"baseurl_value":     security.SanitizeURL(cfg.BaseURL),
+		"authid_set":        cfg.AuthID != "",
+		"datastore_set":     cfg.Datastore != "",
+		"validation_ok":     validationError == "",
+		"validation_error":  validationError,
+		"mode":              a.mode.String(),
+	}
+}
+
 // SaveConfig saves the configuration
 func (a *App) SaveConfig(config *Config) error {
 	// Log sanitized config (no secrets)
@@ -375,8 +408,16 @@ func (a *App) SaveConfig(config *Config) error {
 		return err
 	}
 
+	// Save to disk
+	if err := config.Save(); err != nil {
+		writeDebugLog(fmt.Sprintf("Config save to disk failed: %v", err))
+		return err
+	}
+
+	// Update in-memory config
 	a.config = config
-	return config.Save()
+	writeDebugLog("Config saved successfully and loaded into app")
+	return nil
 }
 
 // TestConnection tests the PBS connection with the provided config (or current if nil)
@@ -437,10 +478,13 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 	// Route based on execution mode
 	switch a.mode {
 	case api.ModeService:
-		// Use HTTP API to communicate with service
+		// Use HTTP API to communicate with service (service has admin rights as LocalSystem)
 		return a.startBackupViaService(backupType, backupDirs, driveLetters, excludeList, backupID, useVSS)
 	case api.ModeStandalone:
-		// Direct execution (current behavior)
+		// Direct execution - check admin if VSS requested
+		if useVSS && !isAdmin() {
+			return fmt.Errorf("VSS (Shadow Copy) nécessite les privilèges administrateur - veuillez redémarrer l'application en tant qu'administrateur ou désactiver VSS")
+		}
 		return a.startBackupDirect(backupType, backupDirs, driveLetters, excludeList, backupID, useVSS)
 	default:
 		return fmt.Errorf("unknown execution mode: %v", a.mode)
@@ -534,10 +578,8 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 		}
 	}
 
-	// Check admin privileges if VSS is requested (only in standalone mode)
-	if useVSS && !isAdmin() {
-		return fmt.Errorf("VSS (Shadow Copy) nécessite les privilèges administrateur - veuillez redémarrer l'application en tant qu'administrateur ou désactiver VSS")
-	}
+	// Note: Admin check for VSS is done in StartBackup() routing layer
+	// If we're here via service, we're already running as LocalSystem
 
 	// Validate PBS config
 	if err := a.config.Validate(); err != nil {
