@@ -15,6 +15,7 @@ GUI_DIR := gui
 CLI_DIR_BIN := proxmoxbackup-directory
 CLI_MACHINE_BIN := proxmoxbackup-machine
 CLI_NBD_BIN := proxmoxbackup-nbd
+SERVICE_BIN := nimbus-backup-service
 GUI_BIN := NimbusBackup
 
 # Go build flags (security hardening)
@@ -84,6 +85,14 @@ ifeq ($(shell go env GOOS),linux)
 else
 	@echo "⏭️  Skipping NBD Server CLI (Linux only)"
 endif
+
+# Service Build
+service:
+	@echo "🔧 Building Backup Service..."
+	@mkdir -p $(BUILD_DIR)
+	cd service && go mod tidy && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
+		-o ../$(BUILD_DIR)/$(SERVICE_BIN)$(shell go env GOEXE)
+	@echo "✅ Built: $(BUILD_DIR)/$(SERVICE_BIN)"
 
 # GUI Build
 gui:
