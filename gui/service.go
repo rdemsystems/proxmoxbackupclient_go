@@ -17,11 +17,13 @@ import (
 type NimbusService struct {
 	app       *App
 	apiServer *api.Server
+	stopChan  chan struct{}
 }
 
 // Start is called when the service starts
 func (s *NimbusService) Start(svc service.Service) error {
 	writeDebugLog("NimbusBackup service starting...")
+	s.stopChan = make(chan struct{})
 	go s.run()
 	return nil
 }
@@ -66,17 +68,20 @@ func (s *NimbusService) run() {
 		}
 	}()
 
-	// Keep the service running (scheduler runs in background goroutine)
-	for {
-		time.Sleep(1 * time.Minute)
-		// Service is alive, scheduler and API server run in background
-		// When Stop() is called, the scheduler will stop and this loop will be interrupted
-	}
+	// Keep the service running (scheduler and API server run in background goroutines)
+	writeDebugLog("Service main loop started, waiting for stop signal")
+	<-s.stopChan // Block until stop signal received
+	writeDebugLog("Stop signal received, service main loop exiting")
 }
 
 // Stop is called when the service stops
 func (s *NimbusService) Stop(svc service.Service) error {
 	writeDebugLog("NimbusBackup service stopping...")
+
+	// Signal the main loop to exit
+	if s.stopChan != nil {
+		close(s.stopChan)
+	}
 
 	// Stop the scheduler gracefully
 	if s.app != nil {

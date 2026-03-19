@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.68 (2026-03-19)
+- **FIX**: Service stop mechanism with stopChan (proper shutdown during upgrades)
+- **FIX**: Replace infinite sleep loop with channel-based blocking
+- **QUALITY**: Service now stops cleanly on upgrade/uninstall
+
 ### v0.1.67 (2026-03-19)
 - **FIX**: Lint error S1000 - use for range instead of for-select
 - **QUALITY**: Clean code pattern in pollBackupProgress
@@ -147,5 +152,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.67
+**Version actuelle:** 0.1.68
 **Dernière mise à jour:** 2026-03-19
