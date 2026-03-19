@@ -19,6 +19,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"pbscommon"
 	"security"
+
+	"github.com/tizbac/proxmoxbackupclient_go/gui/api"
 )
 
 //go:embed all:frontend/dist
@@ -215,9 +217,11 @@ Please report this issue to RDEM Systems:
 
 // App struct
 type App struct {
-	ctx          context.Context
-	config       *Config
+	ctx           context.Context
+	config        *Config
 	stopScheduler chan struct{}
+	apiClient     *api.Client
+	mode          api.ExecutionMode
 }
 
 // NewApp creates a new App application struct
@@ -225,6 +229,7 @@ func NewApp() *App {
 	return &App{
 		config:        LoadConfig(),
 		stopScheduler: make(chan struct{}),
+		apiClient:     api.NewClient(),
 	}
 }
 
@@ -233,14 +238,26 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	writeDebugLog("App.startup() called")
 
-	// Cleanup any abandoned "running" jobs from previous session
-	a.CleanupAbandonedJobs()
+	// Detect execution mode (Service vs Standalone)
+	detector := api.NewModeDetector()
+	a.mode = detector.DetectMode()
+	writeDebugLog(fmt.Sprintf("Execution mode: %s", a.mode.String()))
 
-	// Start background job scheduler
-	a.StartScheduler()
-	writeDebugLog("Background scheduler started")
+	// If running in standalone mode, start local scheduler
+	// If in service mode, scheduler runs in the service
+	if a.mode == api.ModeStandalone {
+		// Cleanup any abandoned "running" jobs from previous session
+		a.CleanupAbandonedJobs()
+
+		// Start background job scheduler
+		a.StartScheduler()
+		writeDebugLog("Background scheduler started (standalone mode)")
+	} else {
+		writeDebugLog("Service mode detected - scheduler runs in service")
+	}
 
 	// Execute startup jobs (jobs with runAtStartup=true)
+	// Note: In service mode, these will be sent via API
 	go a.HandleStartupRun()
 
 	// Setup system tray for background operation
@@ -392,14 +409,54 @@ func (a *App) GetLastBackupDirs() []string {
 	return a.config.LastBackupDirs
 }
 
-// StartBackup starts a backup operation
+// StartBackup starts a backup operation (routes to service or direct based on mode)
 func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
+	writeDebugLog(fmt.Sprintf("StartBackup() called - mode: %s, VSS: %v", a.mode.String(), useVSS))
+
+	// Route based on execution mode
+	switch a.mode {
+	case api.ModeService:
+		// Use HTTP API to communicate with service
+		return a.startBackupViaService(backupType, backupDirs, driveLetters, excludeList, backupID, useVSS)
+	case api.ModeStandalone:
+		// Direct execution (current behavior)
+		return a.startBackupDirect(backupType, backupDirs, driveLetters, excludeList, backupID, useVSS)
+	default:
+		return fmt.Errorf("unknown execution mode: %v", a.mode)
+	}
+}
+
+// startBackupViaService sends backup request to the service via HTTP API
+func (a *App) startBackupViaService(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
+	writeDebugLog("[Service Mode] Sending backup request to service")
+
+	req := &api.BackupRequest{
+		BackupType:   backupType,
+		BackupID:     backupID,
+		BackupDirs:   backupDirs,
+		DriveLetters: driveLetters,
+		ExcludeList:  excludeList,
+		UseVSS:       useVSS,
+	}
+
+	resp, err := a.apiClient.StartBackup(req)
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("[Service Mode] Backup request failed: %v", err))
+		return fmt.Errorf("échec de la communication avec le service: %w", err)
+	}
+
+	writeDebugLog(fmt.Sprintf("[Service Mode] Backup started: %s (JobID: %s)", resp.Message, resp.JobID))
+	return nil
+}
+
+// startBackupDirect performs backup directly (standalone mode)
+func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
 	// Sanitize backup ID for logging
 	sanitizedID := backupID
 	if backupID != "" {
 		sanitizedID = security.SanitizeForLog(backupID)
 	}
-	writeDebugLog(fmt.Sprintf("StartBackup() called: type=%s, id=%s, vss=%v, dir_count=%d",
+	writeDebugLog(fmt.Sprintf("[Standalone Mode] StartBackup: type=%s, id=%s, vss=%v, dir_count=%d",
 		backupType, sanitizedID, useVSS, len(backupDirs)))
 
 	// Validate BackupID
@@ -417,7 +474,7 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 		}
 	}
 
-	// Check admin privileges if VSS is requested
+	// Check admin privileges if VSS is requested (only in standalone mode)
 	if useVSS && !isAdmin() {
 		return fmt.Errorf("VSS (Shadow Copy) nécessite les privilèges administrateur - veuillez redémarrer l'application en tant qu'administrateur ou désactiver VSS")
 	}

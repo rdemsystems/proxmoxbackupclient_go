@@ -18,7 +18,7 @@ type Server struct {
 // BackupHandler interface that the service must implement
 // NOTE: StartBackup will be called in a goroutine (async), so it must be thread-safe
 type BackupHandler interface {
-	StartBackup(backupType, backupID string, backupDirs, driveLetters []string, useVSS bool) error
+	StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool) error
 	GetConfigWithHostname() map[string]interface{}
 	GetScheduledJobs() []map[string]interface{}
 }
@@ -57,7 +57,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := StatusResponse{
 		Running:       true,
-		Version:       "0.1.62", // TODO: get from build
+		Version:       "0.1.63", // TODO: get from build
 		ActiveJobs:    0,         // TODO: track active jobs
 		Configuration: config,
 	}
@@ -90,9 +90,10 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[API] Starting async backup: %s", jobID)
 		err := s.app.StartBackup(
 			req.BackupType,
-			req.BackupID,
 			req.BackupDirs,
 			req.DriveLetters,
+			req.ExcludeList,
+			req.BackupID,
 			req.UseVSS,
 		)
 		if err != nil {

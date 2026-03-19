@@ -6,6 +6,7 @@ type BackupRequest struct {
 	BackupID     string   `json:"backup_id"`
 	BackupDirs   []string `json:"backup_dirs"`
 	DriveLetters []string `json:"drive_letters,omitempty"`
+	ExcludeList  []string `json:"exclude_list,omitempty"`
 	UseVSS       bool     `json:"use_vss"`
 }
 

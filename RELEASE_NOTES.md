@@ -79,6 +79,15 @@
 
 ## 📜 Changelog récent
 
+### v0.1.63 (2026-03-19)
+- **FEAT**: HTTP API fully integrated (GUI-Service communication)
+- **FEAT**: Mode detection (Service vs Standalone) with automatic routing
+- **FEAT**: Service exposes HTTP API on localhost:18765
+- **FEAT**: GUI detects service and uses API for backups (VSS works!)
+- **FEAT**: Fallback to standalone mode if service unavailable
+- **FIX**: VSS now works in Service Mode (admin privileges from LocalSystem)
+- **FIX**: BackupHandler interface matches actual StartBackup signature
+
 ### v0.1.62 (2026-03-19)
 - **FIX**: Service now starts after installation (Start="install" Wait="no")
 - **FIX**: Service starts automatically after reboot (already had Start="auto")
@@ -115,5 +124,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.62
+**Version actuelle:** 0.1.63
 **Dernière mise à jour:** 2026-03-19
