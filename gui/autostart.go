@@ -77,22 +77,3 @@ func isAutoStartEnabledWindows() bool {
 	return err == nil
 }
 
-// HandleStartupRun executes scheduled jobs that have runAtStartup enabled
-func (a *App) HandleStartupRun() {
-	writeDebugLog("HandleStartupRun called - checking for startup jobs")
-
-	jobs, err := a.GetScheduledJobs()
-	if err != nil {
-		writeDebugLog(fmt.Sprintf("Error loading scheduled jobs: %v", err))
-		return
-	}
-
-	for _, job := range jobs {
-		if !job.Enabled || !job.RunAtStartup {
-			continue
-		}
-
-		writeDebugLog(fmt.Sprintf("Executing startup job: %s", job.Name))
-		go a.executeScheduledJob(job)
-	}
-}
