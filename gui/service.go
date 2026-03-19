@@ -31,11 +31,13 @@ func (s *NimbusService) run() {
 	writeDebugLog("NimbusBackup service running")
 
 	// Initialize app with background context (service has no Wails runtime)
+	// IMPORTANT: Service App must be in Standalone mode to execute backups directly
 	s.app = &App{
 		ctx:           context.Background(),
 		config:        LoadConfig(),
 		stopScheduler: make(chan struct{}),
 		apiClient:     api.NewClient(),
+		mode:          api.ModeStandalone, // Service executes directly, doesn't use API
 	}
 
 	// Load configuration (service will read config from file when needed)

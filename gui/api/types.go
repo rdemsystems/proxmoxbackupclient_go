@@ -49,3 +49,15 @@ type ErrorResponse struct {
 	Code    int    `json:"code"`
 	Details string `json:"details,omitempty"`
 }
+
+// BackupProgress represents the current state of a running backup
+type BackupProgress struct {
+	JobID     string  `json:"job_id"`
+	Running   bool    `json:"running"`
+	Progress  float64 `json:"progress"`  // 0-100
+	Message   string  `json:"message"`
+	Success   bool    `json:"success"`
+	Complete  bool    `json:"complete"`
+	Error     string  `json:"error,omitempty"`
+	StartTime string  `json:"start_time,omitempty"`
+}

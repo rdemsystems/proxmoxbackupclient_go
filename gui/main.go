@@ -446,7 +446,49 @@ func (a *App) startBackupViaService(backupType string, backupDirs []string, driv
 	}
 
 	writeDebugLog(fmt.Sprintf("[Service Mode] Backup started: %s (JobID: %s)", resp.Message, resp.JobID))
+
+	// Start polling for progress updates
+	go a.pollBackupProgress(resp.JobID)
+
 	return nil
+}
+
+// pollBackupProgress polls the service for backup progress and emits events to GUI
+func (a *App) pollBackupProgress(jobID string) {
+	writeDebugLog(fmt.Sprintf("[Service Mode] Starting progress polling for job: %s", jobID))
+	ticker := time.NewTicker(3 * time.Second) // Poll every 3 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			progress, err := a.apiClient.GetBackupStatus(jobID)
+			if err != nil {
+				writeDebugLog(fmt.Sprintf("[Service Mode] Failed to get progress: %v", err))
+				continue
+			}
+
+			// Emit progress event to GUI
+			if a.ctx != nil && progress.Running {
+				runtime.EventsEmit(a.ctx, "backup:progress", map[string]interface{}{
+					"percent": progress.Progress,
+					"message": progress.Message,
+				})
+			}
+
+			// If backup completed, emit final event and stop polling
+			if progress.Complete {
+				writeDebugLog(fmt.Sprintf("[Service Mode] Backup completed: success=%v", progress.Success))
+				if a.ctx != nil {
+					runtime.EventsEmit(a.ctx, "backup:complete", map[string]interface{}{
+						"success": progress.Success,
+						"message": progress.Message,
+					})
+				}
+				return
+			}
+		}
+	}
 }
 
 // startBackupDirect performs backup directly (standalone mode)

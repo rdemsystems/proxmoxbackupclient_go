@@ -79,6 +79,14 @@
 
 ## 📜 Changelog récent
 
+### v0.1.66 (2026-03-19)
+- **FIX**: Service now executes backups in ModeStandalone (VSS with admin rights)
+- **FIX**: Service App initialization sets mode explicitly to prevent routing loop
+- **FEAT**: Progress polling infrastructure (GUI polls service every 3s)
+- **FEAT**: BackupProgress API endpoint GET /backup/status/:jobId
+- **FEAT**: Client.GetBackupStatus() for progress queries
+- **ARCHITECTURE**: Service executes directly, doesn't route to itself via API
+
 ### v0.1.65 (2026-03-19)
 - **FIX**: BackupHandler interface type mismatch (GetScheduledJobs signature)
 - **FEAT**: Add GetScheduledJobsForAPI() adapter method for API compatibility
@@ -135,5 +143,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.65
+**Version actuelle:** 0.1.66
 **Dernière mise à jour:** 2026-03-19

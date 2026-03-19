@@ -104,6 +104,30 @@ func (c *Client) StartBackup(req *BackupRequest) (*BackupResponse, error) {
 	return &backupResp, nil
 }
 
+// GetBackupStatus retrieves the current status of a backup job
+func (c *Client) GetBackupStatus(jobID string) (*BackupProgress, error) {
+	resp, err := c.httpClient.Get(c.baseURL + "/backup/status/" + jobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get backup status: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("backup job not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("service returned error: %d", resp.StatusCode)
+	}
+
+	var progress BackupProgress
+	if err := json.NewDecoder(resp.Body).Decode(&progress); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &progress, nil
+}
+
 // GetJobs retrieves the list of configured jobs
 func (c *Client) GetJobs() (*JobsResponse, error) {
 	resp, err := c.httpClient.Get(c.baseURL + "/jobs")

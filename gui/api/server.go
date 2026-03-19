@@ -5,18 +5,23 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 )
 
 // Server handles HTTP API requests from the GUI
 type Server struct {
-	addr string
-	app  BackupHandler
-	mux  *http.ServeMux
+	addr            string
+	app             BackupHandler
+	mux             *http.ServeMux
+	backupProgress  map[string]*BackupProgress
+	progressMutex   sync.RWMutex
 }
 
 // BackupHandler interface that the service must implement
 // NOTE: StartBackup will be called in a goroutine (async), so it must be thread-safe
+// TODO: Add progress callback parameters to get real-time progress updates
 type BackupHandler interface {
 	StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool) error
 	GetConfigWithHostname() map[string]interface{}
@@ -26,9 +31,10 @@ type BackupHandler interface {
 // NewServer creates a new API server
 func NewServer(addr string, handler BackupHandler) *Server {
 	s := &Server{
-		addr: addr,
-		app:  handler,
-		mux:  http.NewServeMux(),
+		addr:           addr,
+		app:            handler,
+		mux:            http.NewServeMux(),
+		backupProgress: make(map[string]*BackupProgress),
 	}
 
 	s.setupRoutes()
@@ -38,6 +44,7 @@ func NewServer(addr string, handler BackupHandler) *Server {
 func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/status", s.handleStatus)
 	s.mux.HandleFunc("/backup", s.handleBackup)
+	s.mux.HandleFunc("/backup/status/", s.handleBackupStatus)
 	s.mux.HandleFunc("/jobs", s.handleJobs)
 }
 
@@ -57,7 +64,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := StatusResponse{
 		Running:       true,
-		Version:       "0.1.65", // TODO: get from build
+		Version:       "0.1.66", // TODO: get from build
 		ActiveJobs:    0,         // TODO: track active jobs
 		Configuration: config,
 	}
@@ -86,8 +93,22 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	// Start backup asynchronously (don't block HTTP request)
 	jobID := fmt.Sprintf("backup-%d", time.Now().Unix())
 
+	// Initialize progress tracking
+	s.progressMutex.Lock()
+	s.backupProgress[jobID] = &BackupProgress{
+		JobID:     jobID,
+		Running:   true,
+		Progress:  0,
+		Message:   "Starting backup...",
+		StartTime: time.Now().Format(time.RFC3339),
+	}
+	s.progressMutex.Unlock()
+
 	go func() {
 		log.Printf("[API] Starting async backup: %s", jobID)
+		// Call startBackupDirect directly - service must execute, not route
+		// Note: startBackupDirect is not exported, so we need to expose it or use a different approach
+		// For now, we'll call StartBackup but ensure service App is in standalone mode
 		err := s.app.StartBackup(
 			req.BackupType,
 			req.BackupDirs,
@@ -96,11 +117,25 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 			req.BackupID,
 			req.UseVSS,
 		)
-		if err != nil {
-			log.Printf("[API] Backup %s failed: %v", jobID, err)
-		} else {
-			log.Printf("[API] Backup %s completed successfully", jobID)
+
+		// Update final status
+		s.progressMutex.Lock()
+		if progress, exists := s.backupProgress[jobID]; exists {
+			progress.Running = false
+			progress.Complete = true
+			if err != nil {
+				progress.Success = false
+				progress.Error = err.Error()
+				progress.Message = fmt.Sprintf("Backup failed: %v", err)
+				log.Printf("[API] Backup %s failed: %v", jobID, err)
+			} else {
+				progress.Success = true
+				progress.Progress = 100
+				progress.Message = "Backup completed successfully"
+				log.Printf("[API] Backup %s completed successfully", jobID)
+			}
 		}
+		s.progressMutex.Unlock()
 	}()
 
 	// Return immediately with job ID
@@ -111,6 +146,32 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, resp, http.StatusOK)
+}
+
+func (s *Server) handleBackupStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract job ID from URL path: /backup/status/{jobID}
+	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/backup/status/"), "/")
+	if len(pathParts) == 0 || pathParts[0] == "" {
+		s.writeError(w, "Job ID required", http.StatusBadRequest)
+		return
+	}
+	jobID := pathParts[0]
+
+	s.progressMutex.RLock()
+	progress, exists := s.backupProgress[jobID]
+	s.progressMutex.RUnlock()
+
+	if !exists {
+		s.writeError(w, "Job not found", http.StatusNotFound)
+		return
+	}
+
+	s.writeJSON(w, progress, http.StatusOK)
 }
 
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
