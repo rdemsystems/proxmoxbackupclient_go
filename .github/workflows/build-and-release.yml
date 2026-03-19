@@ -13,6 +13,29 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  # Check for outdated dependencies (informational only)
+  check-deps:
+    name: Check Dependency Updates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check for available updates
+        working-directory: gui
+        env:
+          GOWORK: off
+        run: |
+          echo "📦 Current dependencies and available updates:"
+          echo "================================================"
+          go list -u -m all | grep '\[' || echo "✅ All dependencies are up to date!"
+          echo ""
+          echo "Legend: module current-version [latest-version]"
+          echo "No brackets = already at latest version"
+
   # Security and quality checks
   security:
     name: Security Checks

@@ -1,4 +1,6 @@
 # golangci-lint configuration for Nimbus Backup GUI
+version: 2
+
 run:
   timeout: 5m
   tests: true
