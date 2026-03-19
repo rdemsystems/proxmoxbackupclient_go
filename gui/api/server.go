@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // Server handles HTTP API requests from the GUI
@@ -17,6 +18,7 @@ type Server struct {
 }
 
 // BackupHandler interface that the service must implement
+// NOTE: StartBackup will be called in a goroutine (async), so it must be thread-safe
 type BackupHandler interface {
 	StartBackup(backupType, backupID string, backupDirs, driveLetters []string, useVSS bool) error
 	GetConfigWithHostname() map[string]interface{}
@@ -83,23 +85,30 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Execute backup via the handler
-	err := s.app.StartBackup(
-		req.BackupType,
-		req.BackupID,
-		req.BackupDirs,
-		req.DriveLetters,
-		req.UseVSS,
-	)
+	// Start backup asynchronously (don't block HTTP request)
+	jobID := fmt.Sprintf("backup-%d", time.Now().Unix())
 
-	if err != nil {
-		s.writeError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	go func() {
+		writeDebugLog(fmt.Sprintf("Starting async backup: %s", jobID))
+		err := s.app.StartBackup(
+			req.BackupType,
+			req.BackupID,
+			req.BackupDirs,
+			req.DriveLetters,
+			req.UseVSS,
+		)
+		if err != nil {
+			writeDebugLog(fmt.Sprintf("Backup %s failed: %v", jobID, err))
+		} else {
+			writeDebugLog(fmt.Sprintf("Backup %s completed successfully", jobID))
+		}
+	}()
 
+	// Return immediately with job ID
 	resp := BackupResponse{
 		Success: true,
-		Message: "Backup started successfully",
+		Message: "Backup started successfully (running in background)",
+		JobID:   jobID,
 	}
 
 	s.writeJSON(w, resp, http.StatusOK)

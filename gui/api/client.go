@@ -11,8 +11,8 @@ import (
 
 const (
 	DefaultServiceURL = "http://127.0.0.1:18765"
-	ConnectionTimeout = 2 * time.Second
-	RequestTimeout    = 30 * time.Second
+	ConnectionTimeout = 5 * time.Second  // Increased for service startup
+	RequestTimeout    = 30 * time.Second // Backup returns immediately, safe
 )
 
 // Client handles communication with the local service
