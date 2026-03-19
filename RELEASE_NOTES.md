@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.51 (2026-03-19)
+- **REFACTOR**: CI now uses reproducible dependency management
+- **FIX**: golangci-lint v2.11.3 config compatibility (output.formats format)
+- **FIX**: go.work version format (go 1.25.0 instead of go 1.25)
+- **STRATEGY**: Dependencies pinned via go.mod/go.sum, no auto-update on builds
+
 ### v0.1.50 (2026-03-19)
 - **UPGRADE**: All Go modules upgraded to Go 1.25
 - **FIX**: CI golangci-lint compatibility (now uses latest version)
@@ -137,5 +143,5 @@
 
 ---
 
-**Version actuelle:** 0.1.50
+**Version actuelle:** 0.1.51
 **Dernière mise à jour:** 2026-03-19
