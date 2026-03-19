@@ -50,6 +50,7 @@ func getConfigPath() (string, error) {
 		configDir = filepath.Join(homeDir, ".proxmox-backup-guardian")
 	}
 
+	// #nosec G703 -- ProgramData is a trusted Windows system environment variable, not user input
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", err
 	}

@@ -79,6 +79,10 @@
 
 ## 📜 Changelog récent
 
+### v0.1.73 (2026-03-19)
+- **FIX**: gosec G703 warnings for ProgramData path usage
+- **QUALITY**: Added nosec comments with justification for false positive path traversal warnings
+
 ### v0.1.72 (2026-03-19)
 - **CRITICAL FIX**: Unified config location - service now has PBS config!
 - **FIX**: Config, scheduled_jobs, job_history now in C:\ProgramData\NimbusBackup\
@@ -172,5 +176,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.72
+**Version actuelle:** 0.1.73
 **Dernière mise à jour:** 2026-03-19
