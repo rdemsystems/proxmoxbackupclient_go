@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.53 (2026-03-19)
+- **FEAT**: New manual workflow for dependency updates (workflow_dispatch)
+- **FEAT**: Automatic dependency checker shows available updates
+- **FIX**: golangci-lint v2.11.3 compatibility (version field required)
+- **STRATEGY**: Two-step approach - check what's outdated, then update manually
+
 ### v0.1.52 (2026-03-19)
 - **FIX**: CI workspace modules - remove go mod download for local replacements
 - **FIX**: Resolves missing ziphash errors for clientcommon/pbscommon/retry/security/snapshot
@@ -147,5 +153,5 @@
 
 ---
 
-**Version actuelle:** 0.1.52
+**Version actuelle:** 0.1.53
 **Dernière mise à jour:** 2026-03-19

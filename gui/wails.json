@@ -14,7 +14,7 @@
   "info": {
     "companyName": "RDEM Systems",
     "productName": "Nimbus Backup",
-    "productVersion": "0.1.52",
+    "productVersion": "0.1.53",
     "copyright": "© 2024-2026 RDEM Systems. All rights reserved.",
     "comments": "Client de sauvegarde pour Proxmox Backup Server"
   },
