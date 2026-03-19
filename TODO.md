@@ -134,7 +134,29 @@
   - [ ] Détecter fichier ouvert sans VSS
   - [ ] Erreur propre: "Fichier X verrouillé, activer VSS?"
 
-### Chiffrement (Phase 2)
+### Multi-Serveurs PBS (Phase 2)
+- [ ] **Configuration multiple**
+  - [ ] Support N serveurs PBS dans config.json:
+    ```json
+    "pbs_servers": [
+      {"name": "PBS Primary", "url": "...", "token": "...", "priority": 1},
+      {"name": "PBS Backup", "url": "...", "token": "...", "priority": 2}
+    ]
+    ```
+  - [ ] Sélection serveur par job (dropdown dans GUI)
+  - [ ] Serveur par défaut configurable
+
+- [ ] **Redondance/Failover**
+  - [ ] Option "Backup vers serveurs multiples" (copie sur N destinations)
+  - [ ] Failover automatique si serveur primaire down
+  - [ ] Status: afficher quel serveur est utilisé
+
+- [ ] **Use Cases**
+  - [ ] PBS local (rapide) + PBS cloud (archivage)
+  - [ ] PBS prod + PBS dev/test
+  - [ ] Geo-redundancy (site A + site B)
+
+### Chiffrement (Phase 3)
 - [ ] **Key Management**
   - [ ] Génération clé asymétrique
   - [ ] Stockage: Windows Credential Manager (DPAPI)
@@ -144,7 +166,7 @@
   - [ ] Checkbox "Activer chiffrement"
   - [ ] Warning: "Sans la clé, restauration impossible!"
 
-### Restauration locale (Phase 3)
+### Restauration locale (Phase 4)
 - [ ] **Navigateur de snapshots**
   - [ ] Liste des snapshots depuis PBS
   - [ ] Parcourir le catalog (lazy loading)
@@ -155,7 +177,7 @@
   - [ ] Gestion conflits (Écraser/Renommer)
   - [ ] Extraction via service (droits admin)
 
-### Mode Entreprise (Phase 4)
+### Mode Entreprise (Phase 5)
 **Évolution naturelle grâce à l'architecture HTTP!**
 
 - [ ] **HTTP Remote API** (extension du mode local)
