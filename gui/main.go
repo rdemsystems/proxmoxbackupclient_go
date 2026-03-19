@@ -220,6 +220,9 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	writeDebugLog("App.startup() called")
 
+	// Cleanup any abandoned "running" jobs from previous session
+	a.CleanupAbandonedJobs()
+
 	// Start background job scheduler
 	a.StartScheduler()
 	writeDebugLog("Background scheduler started")
@@ -452,6 +455,24 @@ func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters [
 				"success": success,
 				"message": message,
 			})
+
+			// Add manual backup to history
+			historyEntry := JobHistory{
+				ID:         fmt.Sprintf("%d", time.Now().Unix()),
+				Name:       fmt.Sprintf("Backup manuel - %s", backupID),
+				Timestamp:  time.Now().Format(time.RFC3339),
+				Status:     "success",
+				Message:    message,
+				BackupDirs: targetDirs,
+				BackupID:   backupID,
+				UseVSS:     useVSS,
+			}
+			if !success {
+				historyEntry.Status = "failed"
+			}
+			if err := a.AddJobHistory(historyEntry); err != nil {
+				writeDebugLog(fmt.Sprintf("Warning: Failed to add manual backup to history: %v", err))
+			}
 
 			// Save last used backup directories on success
 			if success && backupType == "directory" {

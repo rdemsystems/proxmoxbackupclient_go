@@ -262,6 +262,49 @@ func (a *App) StartScheduler() {
 	}()
 }
 
+// CleanupAbandonedJobs marks any "running" jobs as abandoned on app startup
+func (a *App) CleanupAbandonedJobs() {
+	writeDebugLog("CleanupAbandonedJobs called - cleaning up stale running jobs")
+
+	history, err := a.GetJobHistory()
+	if err != nil {
+		writeDebugLog(fmt.Sprintf("Error loading job history: %v", err))
+		return
+	}
+
+	modified := false
+	for i, entry := range history {
+		if entry.Status == "running" {
+			writeDebugLog(fmt.Sprintf("Marking abandoned job as failed: %s", entry.Name))
+			history[i].Status = "failed"
+			history[i].Message = "Abandonné (application interrompue)"
+			history[i].Timestamp = time.Now().Format(time.RFC3339)
+			modified = true
+		}
+	}
+
+	if modified {
+		// Save updated history
+		historyPath, err := getJobHistoryPath()
+		if err != nil {
+			writeDebugLog(fmt.Sprintf("Error getting history path: %v", err))
+			return
+		}
+
+		data, err := json.MarshalIndent(history, "", "  ")
+		if err != nil {
+			writeDebugLog(fmt.Sprintf("Error marshaling history: %v", err))
+			return
+		}
+
+		if err := os.WriteFile(historyPath, data, 0600); err != nil {
+			writeDebugLog(fmt.Sprintf("Error saving updated history: %v", err))
+		} else {
+			writeDebugLog("Successfully cleaned up abandoned jobs")
+		}
+	}
+}
+
 // HandleStartupRun executes scheduled jobs that have runAtStartup enabled
 func (a *App) HandleStartupRun() {
 	writeDebugLog("HandleStartupRun called - checking for startup jobs")
