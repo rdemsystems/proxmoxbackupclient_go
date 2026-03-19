@@ -242,6 +242,14 @@ jobs:
           echo "" >> RELEASE_BODY.md
           cat RELEASE_NOTES.md >> RELEASE_BODY.md
 
+          # Add tested with section
+          echo "" >> RELEASE_BODY.md
+          echo "---" >> RELEASE_BODY.md
+          echo "" >> RELEASE_BODY.md
+          echo "### Tested with NimbusBackup" >> RELEASE_BODY.md
+          echo "" >> RELEASE_BODY.md
+          echo "This release has been tested against [NimbusBackup managed PBS](https://nimbus.rdem-systems.com/blog/sauvegarder-windows-proxmox-backup-server/)." >> RELEASE_BODY.md
+
           # Add links at the end
           echo "" >> RELEASE_BODY.md
           echo "---" >> RELEASE_BODY.md
