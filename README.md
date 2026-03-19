@@ -8,6 +8,12 @@ Modern Windows backup client for Proxmox Backup Server with intuitive GUI interf
 - **Nimbus Backup - Fully managed PBS hosting**: https://nimbus.rdem-systems.com/
 - **Support**: contact@rdem-systems.com
 
+Don't want to self-host PBS? Use our managed service:
+👉 [NimbusBackup - Managed PBS in France](https://nimbus.rdem-systems.com/?utm_source=github&utm_campaign=gui-client)
+
+- ✅ From 12€/TB/month
+- ✅ 1 TB free trial
+
 ## 📦 Download
 
 👉 **[Download Latest Release](https://github.com/rdem-systems/proxmoxbackupclient_go/releases)**
