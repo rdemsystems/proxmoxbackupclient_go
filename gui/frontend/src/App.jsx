@@ -277,7 +277,19 @@ function App() {
     }
 
     try {
-      await TestConnection()
+      // Test with current form values (no need to save first)
+      const testConfig = {
+        baseurl: (config.baseurl || '').trim(),
+        certfingerprint: (config.certfingerprint || '').trim(),
+        authid: (config.authid || '').trim(),
+        secret: (config.secret || '').trim(),
+        datastore: (config.datastore || '').trim(),
+        namespace: (config.namespace || '').trim(),
+        backupdir: (config.backupdir || '').trim(),
+        'backup-id': (config['backup-id'] || '').trim(),
+        usevss: config.usevss || false
+      }
+      await TestConnection(testConfig)
       showStatus('✅ Connexion réussie !', 'success')
     } catch (err) {
       showStatus(`❌ ${err}`, 'error')

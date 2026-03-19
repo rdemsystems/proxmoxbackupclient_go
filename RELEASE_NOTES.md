@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.76 (2026-03-19)
+- **UX**: Test Connection now tests form values without saving first
+- **FEATURE**: TestConnection() accepts optional config parameter
+- **IMPROVEMENT**: Users can test configuration before committing to save
+
 ### v0.1.75 (2026-03-19)
 - **FIX**: Safe trim() with fallback for undefined config fields (JSON import crash fix)
 - **QUALITY**: Frontend now handles incomplete/partial config JSON gracefully
@@ -186,5 +191,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.75
+**Version actuelle:** 0.1.76
 **Dernière mise à jour:** 2026-03-19

@@ -375,26 +375,32 @@ func (a *App) SaveConfig(config *Config) error {
 	return config.Save()
 }
 
-// TestConnection tests the PBS connection
-func (a *App) TestConnection() error {
+// TestConnection tests the PBS connection with the provided config (or current if nil)
+func (a *App) TestConnection(config *Config) error {
 	writeDebugLog("TestConnection() called")
 
+	// Use provided config or fallback to current app config
+	testConfig := config
+	if testConfig == nil {
+		testConfig = a.config
+	}
+
 	// Validate config first
-	if err := a.config.Validate(); err != nil {
+	if err := testConfig.Validate(); err != nil {
 		return err
 	}
 
 	// Create PBS client
 	client := &pbscommon.PBSClient{
-		BaseURL:         a.config.BaseURL,
-		CertFingerPrint: a.config.CertFingerprint,
-		AuthID:          a.config.AuthID,
-		Secret:          a.config.Secret,
-		Datastore:       a.config.Datastore,
-		Namespace:       a.config.Namespace,
-		Insecure:        a.config.CertFingerprint != "",
+		BaseURL:         testConfig.BaseURL,
+		CertFingerPrint: testConfig.CertFingerprint,
+		AuthID:          testConfig.AuthID,
+		Secret:          testConfig.Secret,
+		Datastore:       testConfig.Datastore,
+		Namespace:       testConfig.Namespace,
+		Insecure:        testConfig.CertFingerprint != "",
 		Manifest: pbscommon.BackupManifest{
-			BackupID: a.config.BackupID,
+			BackupID: testConfig.BackupID,
 		},
 	}
 
