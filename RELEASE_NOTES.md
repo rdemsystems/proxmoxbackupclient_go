@@ -79,6 +79,13 @@
 
 ## 📜 Changelog récent
 
+### v0.1.59 (2026-03-19)
+- **FEAT**: HTTP API architecture for GUI-Service communication (async backups)
+- **FEAT**: Hybrid mode detection (Service/Standalone with auto-fallback)
+- **FEAT**: Smart VSS warning (only if !admin AND !service)
+- **DOCS**: Complete TODO.md roadmap + multi-server PBS support
+- **DOCS**: Enterprise deployment guide (GPO/Intune with config JSON)
+
 ### v0.1.58 (2026-03-19)
 - **FEAT**: GPL v3 license added to MSI installer (upstream compliance)
 - **FIX**: Service no longer starts during installation (prevents hang)
@@ -93,5 +100,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.58
+**Version actuelle:** 0.1.59
 **Dernière mise à jour:** 2026-03-19
