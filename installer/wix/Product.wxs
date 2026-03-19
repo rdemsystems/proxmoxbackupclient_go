@@ -15,6 +15,7 @@
     <Package InstallerVersion="200"
              Compressed="yes"
              InstallScope="perMachine"
+             Platform="x64"
              Description="$(var.ProductName) - Proxmox Backup Server Client"
              Comments="Backup client with automatic scheduling and VSS support" />
 
