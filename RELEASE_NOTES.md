@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.55 (2026-03-19)
+- **FIX**: All 24 staticcheck ST1005 linting errors corrected
+- **QUALITY**: Error strings now follow Go conventions (lowercase, no trailing punctuation)
+- **CLEAN**: golangci-lint v2.11.3 passes cleanly with Go 1.25
+
 ### v0.1.54 (2026-03-19)
 - **FIX**: Remove deprecated gosimple linter (merged into staticcheck in v2.x)
 - **VERIFIED**: All dependencies already at latest compatible versions
@@ -158,5 +163,5 @@
 
 ---
 
-**Version actuelle:** 0.1.54
+**Version actuelle:** 0.1.55
 **Dernière mise à jour:** 2026-03-19
