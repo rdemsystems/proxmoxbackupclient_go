@@ -69,19 +69,37 @@
 ### MSI - Finitions
 
 - [ ] **Installation Silencieuse (Silent Install)**
-  - [ ] Support arguments ligne de commande:
+  - [ ] **Approche: Config JSON pré-configuré** (propre pour AD/GPO)
     ```powershell
-    msiexec /i NimbusBackup.msi /qn SERVER=pbs.example.com TOKEN=user@pbs!secret DATASTORE=backup NAMESPACE=clients
+    # Déploiement avec config centralisée
+    msiexec /i NimbusBackup.msi /qn CONFIGFILE="\\ad-server\deploy\nimbus\config.json"
     ```
-  - [ ] Properties WiX à ajouter:
-    - `SERVER` → URL du PBS
-    - `TOKEN` → API Token (format: user@realm!secret)
-    - `DATASTORE` → Nom du datastore
-    - `NAMESPACE` → Namespace PBS (optionnel)
-    - `BACKUP_ID` → ID de backup (défaut: hostname)
-  - [ ] CustomAction: écrire config.json si properties fournies
+  - [ ] Property WiX: `CONFIGFILE` (chemin vers config.json)
+  - [ ] CustomAction WiX:
+    - Si `CONFIGFILE` fourni → copier vers `C:\ProgramData\Nimbus\config.json`
+    - Valider JSON avant copie (éviter corruption)
+    - Log erreur si fichier inaccessible
+  - [ ] Template config.json à fournir:
+    ```json
+    {
+      "pbs_url": "https://pbs.example.com:8007",
+      "auth_id": "backup-user@pbs",
+      "secret": "your-api-token-secret",
+      "datastore": "backup",
+      "namespace": "clients",
+      "backup_id": "",  // Vide = utilise hostname
+      "backup_dirs": ["C:\\Users", "C:\\Important"],
+      "exclusions": ["*.tmp", "*.log"],
+      "schedule": {
+        "enabled": true,
+        "time": "02:00",
+        "days": ["monday", "wednesday", "friday"]
+      },
+      "vss_enabled": true
+    }
+    ```
   - [ ] Test: install silencieux → service démarre avec config OK
-  - [ ] Doc: guide déploiement GPO/Intune
+  - [ ] Doc: guide déploiement GPO/Intune avec config.json
 
 - [ ] **Code Signing**
   - [ ] Signer le binaire `.exe`
