@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -32,48 +33,78 @@ func (a *App) IsAutoStartEnabled() bool {
 	return isAutoStartEnabledWindows()
 }
 
-// Windows: Use Registry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
+// Windows: Use Task Scheduler with highest privileges for admin rights
 func enableAutoStartWindows(exePath string) error {
-	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE)
-	if err != nil {
-		return fmt.Errorf("failed to open registry key: %w", err)
-	}
-	defer key.Close()
+	// Use schtasks to create a task that runs at logon with highest privileges
+	// This ensures the app starts with admin rights for VSS to work
+	taskName := "NimbusBackup"
 
-	// Set registry value to start minimized to tray
-	err = key.SetStringValue("NimbusBackup", fmt.Sprintf(`"%s" --minimized`, exePath))
-	if err != nil {
-		return fmt.Errorf("failed to set registry value: %w", err)
+	// Delete existing task if any
+	disableAutoStartWindows()
+
+	// Also clean up old registry entry if exists (migration from old version)
+	cleanupLegacyRegistryEntry()
+
+	// Create task with highest privileges
+	// /SC ONLOGON = trigger at logon
+	// /RL HIGHEST = run with highest privileges (admin)
+	// /F = force create (overwrite if exists)
+	cmd := fmt.Sprintf(`schtasks /Create /TN "%s" /TR "\"%s\" --minimized" /SC ONLOGON /RL HIGHEST /F`,
+		taskName, exePath)
+
+	writeDebugLog(fmt.Sprintf("Creating scheduled task: %s", cmd))
+
+	// Execute schtasks command
+	if err := executeCommand("cmd", "/C", cmd); err != nil {
+		return fmt.Errorf("failed to create scheduled task: %w", err)
 	}
 
-	writeDebugLog("Auto-start enabled in Windows registry")
+	writeDebugLog("Auto-start enabled via Task Scheduler with admin privileges")
 	return nil
 }
 
 func disableAutoStartWindows() error {
-	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE)
-	if err != nil {
-		return fmt.Errorf("failed to open registry key: %w", err)
-	}
-	defer key.Close()
+	taskName := "NimbusBackup"
 
-	err = key.DeleteValue("NimbusBackup")
-	if err != nil && err != registry.ErrNotExist {
-		return fmt.Errorf("failed to delete registry value: %w", err)
-	}
+	// Delete scheduled task (ignore error if doesn't exist)
+	cmd := fmt.Sprintf(`schtasks /Delete /TN "%s" /F`, taskName)
+	executeCommand("cmd", "/C", cmd)
 
-	writeDebugLog("Auto-start disabled in Windows registry")
+	writeDebugLog("Auto-start disabled (task scheduler)")
 	return nil
 }
 
 func isAutoStartEnabledWindows() bool {
-	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.QUERY_VALUE)
+	taskName := "NimbusBackup"
+
+	// Query if task exists
+	cmd := fmt.Sprintf(`schtasks /Query /TN "%s"`, taskName)
+	err := executeCommand("cmd", "/C", cmd)
+	return err == nil
+}
+
+// executeCommand executes a Windows command
+func executeCommand(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return false
+		writeDebugLog(fmt.Sprintf("Command failed: %s - %s", err, string(output)))
+		return err
+	}
+	writeDebugLog(fmt.Sprintf("Command success: %s", string(output)))
+	return nil
+}
+
+// cleanupLegacyRegistryEntry removes old registry-based auto-start
+func cleanupLegacyRegistryEntry() {
+	// Import here to avoid issues on non-Windows
+	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE)
+	if err != nil {
+		return
 	}
 	defer key.Close()
 
-	_, _, err = key.GetStringValue("NimbusBackup")
-	return err == nil
+	key.DeleteValue("NimbusBackup")
+	writeDebugLog("Cleaned up legacy registry entry")
 }
 

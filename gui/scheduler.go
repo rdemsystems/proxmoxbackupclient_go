@@ -356,6 +356,9 @@ func (a *App) CleanupAbandonedJobs() {
 func (a *App) HandleStartupRun() {
 	writeDebugLog("HandleStartupRun called - checking for startup jobs")
 
+	// Wait a bit to avoid conflict with scheduler if app starts at scheduled time
+	time.Sleep(5 * time.Second)
+
 	jobs, err := a.GetScheduledJobs()
 	if err != nil {
 		writeDebugLog(fmt.Sprintf("Error loading scheduled jobs: %v", err))
@@ -367,6 +370,8 @@ func (a *App) HandleStartupRun() {
 			continue
 		}
 
+		// Check if this job is already running (mutex protection)
+		// If scheduler already started it, the mutex will prevent duplicate execution
 		writeDebugLog(fmt.Sprintf("Executing startup job: %s", job.Name))
 		go a.executeScheduledJob(job)
 	}
