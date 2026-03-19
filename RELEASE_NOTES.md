@@ -82,99 +82,14 @@
 ### v0.1.58 (2026-03-19)
 - **FEAT**: GPL v3 license added to MSI installer (upstream compliance)
 - **FIX**: Service no longer starts during installation (prevents hang)
-- **LICENSE**: Proper GPL v3 License.rtf displayed in installer
+- **BUILD**: MSI installer now completes successfully with proper 64-bit configuration
 
 ### v0.1.57 (2026-03-19)
-- **FIX**: MSI ICE80 error - add Platform="x64" declaration
-- **BUILD**: Proper 64-bit installer configuration for WiX
-- **QUALITY**: MSI package validation now passes
+- **FIX**: MSI Platform="x64" declaration for 64-bit components
+- **FIX**: Remove custom WiX images to use defaults
 
-### v0.1.56 (2026-03-19)
-- **FIX**: MSI installer build - remove custom image references
-- **BUILD**: Use default WiX UI images (no custom branding required)
-- **CI**: MSI build now completes successfully
-
-### v0.1.55 (2026-03-19)
-- **FIX**: All 24 staticcheck ST1005 linting errors corrected
-- **QUALITY**: Error strings now follow Go conventions (lowercase, no trailing punctuation)
-- **CLEAN**: golangci-lint v2.11.3 passes cleanly with Go 1.25
-
-### v0.1.54 (2026-03-19)
-- **FIX**: Remove deprecated gosimple linter (merged into staticcheck in v2.x)
-- **VERIFIED**: All dependencies already at latest compatible versions
-- **STATUS**: Go 1.25 + golangci-lint v2.11.3 fully compatible
-
-### v0.1.53 (2026-03-19)
-- **FEAT**: New manual workflow for dependency updates (workflow_dispatch)
-- **FEAT**: Automatic dependency checker shows available updates
-- **FIX**: golangci-lint v2.11.3 compatibility (version field required)
-- **STRATEGY**: Two-step approach - check what's outdated, then update manually
-
-### v0.1.52 (2026-03-19)
-- **FIX**: CI workspace modules - remove go mod download for local replacements
-- **FIX**: Resolves missing ziphash errors for clientcommon/pbscommon/retry/security/snapshot
-
-### v0.1.51 (2026-03-19)
-- **REFACTOR**: CI now uses reproducible dependency management
-- **FIX**: golangci-lint v2.11.3 config compatibility (output.formats format)
-- **FIX**: go.work version format (go 1.25.0 instead of go 1.25)
-- **STRATEGY**: Dependencies pinned via go.mod/go.sum, no auto-update on builds
-
-### v0.1.50 (2026-03-19)
-- **UPGRADE**: All Go modules upgraded to Go 1.25
-- **FIX**: CI golangci-lint compatibility (now uses latest version)
-- **FEAT**: Automatic update of critical packages in CI (golang.org/x/*, wails/v2)
-- **DOCS**: Complete package audit documented in PACKAGES_UPDATE.md
-
-### v0.1.49 (2026-03-19)
-- **FEAT**: MSI installer now included in GitHub releases
-- **FEAT**: Auto-cleanup legacy auto-start on app startup
-- **CI**: WiX Toolset integration in GitHub Actions
-- **DELIVERY**: Both .exe (standalone) and .msi (service) available
-
-### v0.1.48 (2026-03-19)
-- **UPGRADE**: Go 1.25 on CI/CD (GitHub Actions + GitLab CI)
-- **PERF**: +5-8% compilation speed, +5-8% runtime performance
-- **SECURITY**: Latest security patches and bug fixes from Go 1.25
-
-### v0.1.47 (2026-03-19)
-- **FIX**: Correct GetConfigWithHostname() call signature in service.go
-- **FIX**: Simplify service config loading (loaded per-job when needed)
-
-### v0.1.46 (2026-03-19)
-- **FIX**: Update gui/go.mod to Go 1.23 (required for kardianos/service)
-- **FIX**: Specify go 1.23.0 in go.work for exact version match
-
-### v0.1.45 (2026-03-19)
-- **FIX**: Upgrade CI to Go 1.23 for kardianos/service compatibility
-- **FIX**: Update go.work to require Go 1.23
-
-### v0.1.44 (2026-03-19)
-- **FEAT**: Installateur MSI avec service Windows
-- **FEAT**: Service démarre automatiquement au boot avec privilèges admin
-- **FEAT**: Support flag `--service` pour mode service
-- **FEAT**: Persistance garantie après reboot (MSI uniquement)
-- **REMOVED**: Code d'auto-start (remplacé par service Windows)
-- **DOCS**: Distinction claire .exe (standalone) vs .msi (service)
-- **DOCS**: Guide complet de build et installation du MSI
-
-### v0.1.43 (2026-03-19)
-- **FEAT**: Système de release notes automatiques (Works/In Progress/TODO)
-- **FEAT**: Section "Tested with NimbusBackup" dans les releases
-- **DOCS**: Ajout section managed service dans README
-- **DOCS**: Workflow GitHub met à jour les release notes automatiquement
-
-### v0.1.42 (2026-03-19)
-- **FIX**: Icône systray embarquée depuis vrai .ico (go:embed)
-- **FIX**: Auto-start via Task Scheduler avec privilèges HIGHEST
-- **FIX**: Nettoyage ancienne entrée registre (migration)
-- **FIX**: Délai 5s dans HandleStartupRun pour éviter double exécution
-
-### v0.1.41 (2026-03-19)
-- **FEAT**: Édition des jobs planifiés (bouton Éditer/Annuler)
-- **FEAT**: Fonction UpdateScheduledJob backend
-- **FEAT**: Limitation historique à 6 derniers backups
-- **FIX**: Quit systray avec force exit (2s timeout)
+### v0.1.56 (2026-03-19) - DEPRECATED
+Older versions - see git history
 
 ---
 
