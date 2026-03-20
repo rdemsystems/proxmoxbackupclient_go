@@ -79,6 +79,11 @@
 
 ## 📜 Changelog récent
 
+### v0.1.86 (2026-03-20)
+- **DEBUG**: Enhanced scheduler logging (job count, NextRun, ShouldRun)
+- **DEBUG**: Logs when no jobs found or jobs disabled
+- **QUALITY**: Easier troubleshooting for scheduled backups not running
+
 ### v0.1.85 (2026-03-20)
 - **FIX**: Separate log files to avoid concurrent write issues
 - **ARCHITECTURE**: debug-gui.log for GUI, debug-service.log for Service
@@ -248,5 +253,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.85
+**Version actuelle:** 0.1.86
 **Dernière mise à jour:** 2026-03-19

@@ -442,31 +442,42 @@ func (a *App) HandleStartupRun() {
 func (a *App) checkAndRunScheduledJobs() {
 	jobs, err := a.GetScheduledJobs()
 	if err != nil {
-		writeDebugLog(fmt.Sprintf("Error loading scheduled jobs: %v", err))
+		writeDebugLog(fmt.Sprintf("[Scheduler] Error loading scheduled jobs: %v", err))
+		return
+	}
+
+	if len(jobs) == 0 {
+		writeDebugLog("[Scheduler] No scheduled jobs found")
 		return
 	}
 
 	now := time.Now()
+	writeDebugLog(fmt.Sprintf("[Scheduler] Checking %d jobs at %s", len(jobs), now.Format("15:04:05")))
 
 	for _, job := range jobs {
 		if !job.Enabled {
+			writeDebugLog(fmt.Sprintf("[Scheduler] Job %s is disabled, skipping", job.Name))
 			continue
 		}
 
 		// Parse next run time
 		if job.NextRun == "" {
+			writeDebugLog(fmt.Sprintf("[Scheduler] Job %s has no NextRun time, skipping", job.Name))
 			continue
 		}
 
 		nextRun, err := time.Parse(time.RFC3339, job.NextRun)
 		if err != nil {
-			writeDebugLog(fmt.Sprintf("Error parsing next run time: %v", err))
+			writeDebugLog(fmt.Sprintf("[Scheduler] Error parsing next run time for %s: %v", job.Name, err))
 			continue
 		}
 
+		writeDebugLog(fmt.Sprintf("[Scheduler] Job %s: NextRun=%s, Now=%s, ShouldRun=%v",
+			job.Name, nextRun.Format("15:04:05"), now.Format("15:04:05"), now.After(nextRun) && now.Before(nextRun.Add(2*time.Minute))))
+
 		// Check if it's time to run (within 2 minute window to avoid missing)
 		if now.After(nextRun) && now.Before(nextRun.Add(2*time.Minute)) {
-			writeDebugLog(fmt.Sprintf("Executing scheduled job: %s", job.Name))
+			writeDebugLog(fmt.Sprintf("[Scheduler] Executing scheduled job: %s", job.Name))
 			go a.executeScheduledJob(job)
 		}
 	}
