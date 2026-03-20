@@ -82,8 +82,10 @@
 ### v0.1.84 (2026-03-20)
 - **CRITICAL FIX**: Mode re-detection on each backup (fixes missing progress bar)
 - **FIX**: GUI now switches to Service mode if service becomes available after startup
+- **FIX**: Separate log files (debug-gui.log & debug-service.log) for easier debugging
 - **ROOT CAUSE**: Mode detected once at startup, never re-checked if service started late
 - **RESULT**: Progress bar now displays during backup execution via service
+- **DEBUG**: GUI logs in debug-gui.log, Service logs in debug-service.log
 
 ### v0.1.83 (2026-03-20)
 - **CRITICAL FIX**: Progress callbacks now use map with mutex (fixes race condition)

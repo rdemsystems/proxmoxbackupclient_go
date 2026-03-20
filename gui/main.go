@@ -72,7 +72,13 @@ func init() {
 	// #nosec G703 -- Path is validated with security.ValidatePath() to prevent traversal
 	// This is a legitimate use case: creating app log directory in user's home/appdata
 	_ = os.MkdirAll(logDir, 0700)
-	debugLogPath = filepath.Join(logDir, "debug.log")
+
+	// Use different log files for GUI and Service
+	if IsServiceMode() {
+		debugLogPath = filepath.Join(logDir, "debug-service.log")
+	} else {
+		debugLogPath = filepath.Join(logDir, "debug-gui.log")
+	}
 
 	// Setup panic recovery
 	defer func() {
