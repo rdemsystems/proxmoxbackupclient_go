@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.82 (2026-03-20)
+- **CRITICAL FIX**: Test Connection now performs real HTTP call to PBS
+- **FIX**: Detects DNS typos immediately (was showing OK with wrong hostname)
+- **FIX**: Clear error messages: connection failed, auth failed, access denied
+- **SECURITY**: 10s timeout prevents hanging on unreachable servers
+
 ### v0.1.81 (2026-03-20)
 - **CRITICAL FIX**: Service now reloads config before each backup (no restart needed)
 - **FIX**: Pre-fill backup dirs from last successful backup (UX improvement)
