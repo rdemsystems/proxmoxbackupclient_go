@@ -493,6 +493,14 @@ func (a *App) ReloadConfig() {
 func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
 	writeDebugLog(fmt.Sprintf("StartBackup() called - mode: %s, VSS: %v", a.mode.String(), useVSS))
 
+	// Re-detect mode if currently Standalone (service may have started after GUI)
+	if a.mode == api.ModeStandalone {
+		if a.apiClient.IsServiceAvailable() {
+			writeDebugLog("[Mode Detection] Service now available, switching to Service mode")
+			a.mode = api.ModeService
+		}
+	}
+
 	// Route based on execution mode
 	switch a.mode {
 	case api.ModeService:

@@ -64,7 +64,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := StatusResponse{
 		Running:       true,
-		Version:       "0.1.83", // TODO: get from build
+		Version:       "0.1.84", // TODO: get from build
 		ActiveJobs:    0,         // TODO: track active jobs
 		Configuration: config,
 	}
