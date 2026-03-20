@@ -79,6 +79,13 @@
 
 ## 📜 Changelog récent
 
+### v0.1.83 (2026-03-20)
+- **CRITICAL FIX**: Progress callbacks now use map with mutex (fixes race condition)
+- **FIX**: Concurrent backups no longer overwrite each other's progress callbacks
+- **ARCHITECTURE**: Callbacks stored per jobID, supports multiple simultaneous backups
+- **DEBUG**: Enhanced logging for callback registration and execution flow
+- **QUALITY**: Service progress updates now reliably reach GUI frontend
+
 ### v0.1.82 (2026-03-20)
 - **CRITICAL FIX**: Test Connection now performs real HTTP call to PBS
 - **FIX**: Detects DNS typos immediately (was showing OK with wrong hostname)
@@ -230,5 +237,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.79
+**Version actuelle:** 0.1.83
 **Dernière mise à jour:** 2026-03-19

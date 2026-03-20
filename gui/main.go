@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -221,15 +222,19 @@ Please report this issue to RDEM Systems:
 }
 
 // App struct
+type progressCallbacks struct {
+	onProgress func(jobID string, percent float64, message string)
+	onComplete func(jobID string, success bool, message string)
+}
+
 type App struct {
 	ctx              context.Context
 	config           *Config
 	stopScheduler    chan struct{}
 	apiClient        *api.Client
 	mode             api.ExecutionMode
-	customOnProgress func(jobID string, percent float64, message string)
-	customOnComplete func(jobID string, success bool, message string)
-	currentJobID     string
+	callbacksMap     map[string]*progressCallbacks
+	callbacksMutex   sync.RWMutex
 }
 
 // NewApp creates a new App application struct
@@ -238,14 +243,19 @@ func NewApp() *App {
 		config:        LoadConfig(),
 		stopScheduler: make(chan struct{}),
 		apiClient:     api.NewClient(),
+		callbacksMap:  make(map[string]*progressCallbacks),
 	}
 }
 
 // SetProgressCallbacks sets custom progress callbacks for API mode
 func (a *App) SetProgressCallbacks(jobID string, onProgress func(string, float64, string), onComplete func(string, bool, string)) {
-	a.currentJobID = jobID
-	a.customOnProgress = onProgress
-	a.customOnComplete = onComplete
+	writeDebugLog(fmt.Sprintf("[SetProgressCallbacks] Registered callbacks for jobID: %s", jobID))
+	a.callbacksMutex.Lock()
+	a.callbacksMap[jobID] = &progressCallbacks{
+		onProgress: onProgress,
+		onComplete: onComplete,
+	}
+	a.callbacksMutex.Unlock()
 }
 
 // startup is called when the app starts
@@ -625,29 +635,69 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 		OnProgress: func(percent float64, message string) {
 			writeDebugLog(fmt.Sprintf("Progress: %.1f%% - %s", percent*100, message))
 
-			// Use custom callback if set (API server mode)
-			if a.customOnProgress != nil && a.currentJobID != "" {
-				a.customOnProgress(a.currentJobID, percent*100, message)
-			} else if a.ctx != nil {
-				// Otherwise emit Wails events (GUI mode)
+			// Check if there's a registered callback for any job (service mode)
+			a.callbacksMutex.RLock()
+			hasCallbacks := len(a.callbacksMap) > 0
+			if hasCallbacks {
+				// Call all registered callbacks (typically just one per backup)
+				for jobID, callbacks := range a.callbacksMap {
+					if callbacks.onProgress != nil {
+						writeDebugLog(fmt.Sprintf("[OnProgress] Calling custom callback for jobID: %s", jobID))
+						callbacks.onProgress(jobID, percent*100, message)
+					}
+				}
+			}
+			a.callbacksMutex.RUnlock()
+
+			// If no custom callbacks and we have Wails context, emit events (GUI standalone mode)
+			if !hasCallbacks && a.ctx != nil {
+				writeDebugLog("[OnProgress] Emitting Wails event (GUI mode)")
 				runtime.EventsEmit(a.ctx, "backup:progress", map[string]interface{}{
 					"percent": percent * 100,
 					"message": message,
 				})
+			} else if !hasCallbacks && a.ctx == nil {
+				writeDebugLog("[OnProgress] WARNING: No callback or context available")
 			}
 		},
 		OnComplete: func(success bool, message string) {
 			writeDebugLog(fmt.Sprintf("Backup complete: success=%v, %s", success, message))
 
-			// Use custom callback if set (API server mode)
-			if a.customOnComplete != nil && a.currentJobID != "" {
-				a.customOnComplete(a.currentJobID, success, message)
-			} else if a.ctx != nil {
-				// Otherwise emit Wails events (GUI mode)
+			// Check if there's a registered callback for any job (service mode)
+			a.callbacksMutex.RLock()
+			hasCallbacks := len(a.callbacksMap) > 0
+			var jobIDsToCleanup []string
+			if hasCallbacks {
+				// Call all registered callbacks and collect jobIDs for cleanup
+				for jobID, callbacks := range a.callbacksMap {
+					if callbacks.onComplete != nil {
+						writeDebugLog(fmt.Sprintf("[OnComplete] Calling custom callback for jobID: %s", jobID))
+						callbacks.onComplete(jobID, success, message)
+					}
+					jobIDsToCleanup = append(jobIDsToCleanup, jobID)
+				}
+			}
+			a.callbacksMutex.RUnlock()
+
+			// Clean up completed callbacks
+			if len(jobIDsToCleanup) > 0 {
+				a.callbacksMutex.Lock()
+				for _, jobID := range jobIDsToCleanup {
+					delete(a.callbacksMap, jobID)
+					writeDebugLog(fmt.Sprintf("[OnComplete] Cleaned up callbacks for jobID: %s", jobID))
+				}
+				a.callbacksMutex.Unlock()
+			}
+
+			// If no custom callbacks and we have Wails context, emit events (GUI standalone mode)
+			if !hasCallbacks && a.ctx != nil {
+				writeDebugLog("[OnComplete] Emitting Wails event (GUI mode)")
 				runtime.EventsEmit(a.ctx, "backup:complete", map[string]interface{}{
 					"success": success,
 					"message": message,
 				})
+			} else if !hasCallbacks && a.ctx == nil {
+				writeDebugLog("[OnComplete] WARNING: No callback or context available")
 			}
 
 			// Add manual backup to history

@@ -64,7 +64,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	status := StatusResponse{
 		Running:       true,
-		Version:       "0.1.82", // TODO: get from build
+		Version:       "0.1.83", // TODO: get from build
 		ActiveJobs:    0,         // TODO: track active jobs
 		Configuration: config,
 	}
@@ -120,6 +120,7 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 			SetProgressCallbacks(jobID string, onProgress func(string, float64, string), onComplete func(string, bool, string))
 		})
 		if ok {
+			log.Printf("[API] SetProgressCallbacks interface found, registering callbacks for %s", jobID)
 			handler.SetProgressCallbacks(
 				jobID,
 				func(jid string, percent float64, message string) {
@@ -128,6 +129,8 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 						progress.Progress = percent
 						progress.Message = message
 						log.Printf("[API] Progress update %s: %.1f%% - %s", jid, percent, message)
+					} else {
+						log.Printf("[API] WARNING: Progress update for unknown job %s", jid)
 					}
 					s.progressMutex.Unlock()
 				},
@@ -142,10 +145,14 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 							progress.Error = message
 						}
 						log.Printf("[API] Backup %s complete: success=%v, %s", jid, success, message)
+					} else {
+						log.Printf("[API] WARNING: Completion update for unknown job %s", jid)
 					}
 					s.progressMutex.Unlock()
 				},
 			)
+		} else {
+			log.Printf("[API] WARNING: SetProgressCallbacks interface not implemented by handler")
 		}
 
 		// Call StartBackup (service App is in standalone mode to execute directly)

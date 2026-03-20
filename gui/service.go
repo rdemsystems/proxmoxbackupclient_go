@@ -40,6 +40,7 @@ func (s *NimbusService) run() {
 		stopScheduler: make(chan struct{}),
 		apiClient:     api.NewClient(),
 		mode:          api.ModeStandalone, // Service executes directly, doesn't use API
+		callbacksMap:  make(map[string]*progressCallbacks),
 	}
 
 	// Load configuration (service will read config from file when needed)
