@@ -73,7 +73,7 @@ func init() {
 	// This is a legitimate use case: creating app log directory in user's home/appdata
 	_ = os.MkdirAll(logDir, 0700)
 
-	// Use different log files for GUI and Service
+	// Use different log files for GUI and Service to avoid concurrent write issues
 	if IsServiceMode() {
 		debugLogPath = filepath.Join(logDir, "debug-service.log")
 	} else {
