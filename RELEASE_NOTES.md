@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.90 (2026-03-21)
+- **FEATURE**: Backup completion report shows duration and size
+- **UX**: "Backup completed in 2m 34s: 1.8 GB backed up (89 new, 565 reused chunks)"
+- **FIX**: MSI upgrade now stops service before installing (Wait=yes)
+- **QUALITY**: Human-readable duration format (Xm Ys or Xh Ym)
+
 ### v0.1.89 (2026-03-21)
 - **CRITICAL FIX**: Service scheduled jobs blocked on Wails EventsEmit
 - **ROOT CAUSE**: context.Background() is not nil, triggered Wails event emission
@@ -270,5 +276,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.89
+**Version actuelle:** 0.1.90
 **Dernière mise à jour:** 2026-03-19

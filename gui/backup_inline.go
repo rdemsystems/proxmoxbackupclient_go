@@ -268,8 +268,24 @@ func (c *ChunkState) Eof(client *pbscommon.PBSClient) error {
 	return nil
 }
 
+// formatDuration formats a duration in a human-readable format
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		mins := int(d.Minutes())
+		secs := int(d.Seconds()) % 60
+		return fmt.Sprintf("%dm %ds", mins, secs)
+	}
+	hours := int(d.Hours())
+	mins := int(d.Minutes()) % 60
+	return fmt.Sprintf("%dh %dm", hours, mins)
+}
+
 // RunBackupInline performs a backup without external binaries
 func RunBackupInline(opts BackupOptions) error {
+	startTime := time.Now()
 	writeDebugLog("Starting inline backup")
 
 	// Validate options
@@ -393,8 +409,13 @@ func RunBackupInline(opts BackupOptions) error {
 
 	progress(1.0, "Backup completed")
 
-	// Build completion message with skipped files info
-	completionMsg := fmt.Sprintf("Backup completed: %d new, %d reused chunks", newchunk.Load(), reusechunk.Load())
+	// Calculate backup duration and size
+	duration := time.Since(startTime)
+	totalSizeMB := float64(totalSize.Load()) / (1024 * 1024)
+
+	// Build completion message with duration, size, and chunk stats
+	completionMsg := fmt.Sprintf("Backup completed in %s: %.1f MB backed up (%d new, %d reused chunks)",
+		formatDuration(duration), totalSizeMB, newchunk.Load(), reusechunk.Load())
 
 	if len(client.SkippedFiles) > 0 {
 		completionMsg += fmt.Sprintf("\n⚠️  %d fichiers/dossiers ignorés (accès refusé ou junction points)", len(client.SkippedFiles))
