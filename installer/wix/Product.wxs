@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <?define ProductName = "Nimbus Backup" ?>
-  <?define ProductVersion = "0.1.91" ?>
+  <?define ProductVersion = "0.1.92" ?>
   <?define Manufacturer = "RDEM Systems" ?>
   <?define UpgradeCode = "12345678-1234-1234-1234-123456789012" ?>
 
@@ -19,7 +19,10 @@
              Description="$(var.ProductName) - Proxmox Backup Server Client"
              Comments="Backup client with automatic scheduling and VSS support" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+      Schedule="afterInstallInitialize"
+      AllowSameVersionUpgrades="yes" />
     <MediaTemplate EmbedCab="yes" />
 
     <!-- Installation directory -->
@@ -57,19 +60,12 @@
         </ServiceInstall>
 
         <ServiceControl
-          Id="StartNimbusBackupService"
+          Id="ControlNimbusBackupService"
           Name="NimbusBackup"
           Start="install"
           Stop="both"
           Wait="yes"
           Remove="uninstall" />
-
-        <!-- Stop service before upgrade -->
-        <ServiceControl
-          Id="StopBeforeUpgrade"
-          Name="NimbusBackup"
-          Stop="both"
-          Wait="yes" />
       </Component>
     </DirectoryRef>
 

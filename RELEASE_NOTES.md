@@ -79,6 +79,12 @@
 
 ## 📜 Changelog récent
 
+### v0.1.92 (2026-03-21)
+- **FIX**: MSI upgrade now uses afterInstallInitialize schedule
+- **FIX**: Remove duplicate ServiceControl elements
+- **IMPROVEMENT**: AllowSameVersionUpgrades for easier testing
+- **QUALITY**: Service should stop cleanly before upgrade
+
 ### v0.1.91 (2026-03-21)
 - **FIX**: Build error - missing totalSize variable declaration
 - **QUALITY**: CI tests now pass
@@ -280,5 +286,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.1.91
+**Version actuelle:** 0.1.92
 **Dernière mise à jour:** 2026-03-19
