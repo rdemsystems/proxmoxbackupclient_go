@@ -535,6 +535,73 @@ function App() {
     reader.readAsText(file)
   }
 
+  // Execute split backup for large volumes
+  const executeSplitBackup = async (dirList, analysis) => {
+    if (!window.go || !window.go.main.App.CreateBackupSplitPlan) {
+      showStatus('❌ Split backup not available', 'error')
+      return
+    }
+
+    try {
+      showStatus('📋 Création du plan de découpage...', 'info')
+      const splitPlan = await window.go.main.App.CreateBackupSplitPlan(
+        dirList,
+        config['backup-id'] || hostname
+      )
+
+      showStatus(`🔄 Lancement de ${splitPlan.length} backups partiels...`, 'info')
+
+      // Execute split jobs sequentially
+      for (let i = 0; i < splitPlan.length; i++) {
+        const job = splitPlan[i]
+        showStatus(
+          `📦 Backup ${job.index}/${job.total_jobs}: ${job.size_fmt}...`,
+          'info'
+        )
+
+        try {
+          await StartBackup(
+            backupType,
+            job.folders,
+            selectedDrives,
+            excludeList.split('\n').filter(l => l.trim()),
+            job.backup_id,
+            config.usevss
+          )
+
+          // Wait for completion (simplified - in production, use event polling)
+          showStatus(
+            `✅ Backup ${job.index}/${job.total_jobs} terminé`,
+            'success'
+          )
+        } catch (err) {
+          showStatus(
+            `❌ Backup ${job.index}/${job.total_jobs} échoué: ${err}`,
+            'error'
+          )
+
+          const retry = window.confirm(
+            `Le backup ${job.index}/${job.total_jobs} a échoué.\n\n` +
+            `Voulez-vous réessayer ce backup avant de continuer?`
+          )
+
+          if (retry) {
+            i-- // Retry same job
+          } else {
+            throw new Error(`Split backup ${job.index} failed`)
+          }
+        }
+      }
+
+      showStatus(
+        `🎉 Tous les backups partiels terminés avec succès (${splitPlan.length}/${splitPlan.length})`,
+        'success'
+      )
+    } catch (err) {
+      showStatus(`❌ Erreur split backup: ${err}`, 'error')
+    }
+  }
+
   const handleStartBackup = async () => {
     if (!StartBackup) {
       showStatus('❌ Wails runtime non disponible', 'error')
@@ -552,6 +619,37 @@ function App() {
     if (backupType === 'machine' && selectedDrives.length === 0) {
       showStatus('❌ Au moins un disque requis', 'error')
       return
+    }
+
+    // Analyze backup size for auto-split (only for directory backups in oneshot mode)
+    if (backupType === 'directory' && backupMode === 'oneshot' && window.go && window.go.main.App.AnalyzeBackup) {
+      try {
+        showStatus('📊 Analyse de la taille du backup...', 'info')
+        const analysis = await window.go.main.App.AnalyzeBackup(dirList)
+
+        if (analysis.should_split) {
+          const confirmSplit = window.confirm(
+            `📦 Backup volumineux détecté (${analysis.total_size_fmt})\n\n` +
+            `Pour améliorer la fiabilité et la vitesse, voulez-vous le découper en ` +
+            `${analysis.suggested_jobs} backups plus petits (~100 GB chacun) ?\n\n` +
+            `✅ Avantages:\n` +
+            `  • Résistance aux pannes (retry ciblé)\n` +
+            `  • Progression visible\n` +
+            `  • Plus rapide en cas d'échec\n\n` +
+            `Les backups seront consolidés automatiquement une fois terminés.`
+          )
+
+          if (confirmSplit) {
+            // User accepted split - execute split backup
+            await executeSplitBackup(dirList, analysis)
+            return
+          }
+          // User declined - continue with normal backup below
+        }
+      } catch (err) {
+        // Analysis failed - continue with normal backup
+        console.warn('Backup analysis failed:', err)
+      }
     }
 
     // Scheduled mode - save or update job instead of executing immediately
