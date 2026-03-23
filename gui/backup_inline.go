@@ -466,6 +466,33 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 	client.Connect(false, "host")
 	knownChunks := hashmap.New[string, bool]()
 
+	// Start keep-alive goroutine to maintain PBS session during long backups
+	keepAliveCtx, keepAliveCancel := context.WithCancel(context.Background())
+	defer keepAliveCancel() // Stop keep-alive when backup completes or fails
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute) // Keep-alive every 5 minutes
+		defer ticker.Stop()
+
+		writeDebugLog("[KeepAlive] Started - will ping PBS every 5 minutes")
+
+		for {
+			select {
+			case <-keepAliveCtx.Done():
+				writeDebugLog("[KeepAlive] Stopped (backup finished)")
+				return
+			case <-ticker.C:
+				writeDebugLog("[KeepAlive] Sending ping to PBS...")
+				if err := client.KeepAlive(); err != nil {
+					writeDebugLog(fmt.Sprintf("[KeepAlive] WARNING: Ping failed: %v", err))
+					// Continue anyway - don't stop the backup for keep-alive failures
+				} else {
+					writeDebugLog("[KeepAlive] Ping successful")
+				}
+			}
+		}
+	}()
+
 	// Start background scan to calculate total size
 	totalSize := &atomic.Uint64{}
 	go func() {
