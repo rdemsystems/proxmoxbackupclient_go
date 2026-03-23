@@ -38,7 +38,6 @@ const (
 var appVersion = "dev" // Default for local dev without ldflags
 
 var (
-	debugLogPath    string
 	crashReportPath string
 )
 
@@ -48,39 +47,6 @@ func init() {
 	exePath, _ := os.Executable()
 	exeDir := filepath.Dir(exePath)
 	crashReportPath = filepath.Join(exeDir, "crash_report.txt")
-
-	// Setup debug log file in ProgramData (Windows) or user home (others)
-	// ProgramData is accessible by both GUI (user) and Service (LocalSystem)
-	var logDir string
-	if programData := os.Getenv("ProgramData"); programData != "" {
-		// Windows: use C:\ProgramData\NimbusBackup (shared between GUI and Service)
-		logDir = filepath.Join(programData, "NimbusBackup")
-	} else if systemDrive := os.Getenv("SystemDrive"); systemDrive != "" {
-		// Windows fallback: if ProgramData not set, use C:\ProgramData hardcoded
-		// This ensures service logs are accessible even if env var is missing
-		logDir = filepath.Join(systemDrive, "ProgramData", "NimbusBackup")
-	} else {
-		// Unix-like: use ~/.nimbus-backup
-		homeDir, _ := os.UserHomeDir()
-		logDir = filepath.Join(homeDir, ".nimbus-backup")
-	}
-
-	// Validate path for security (prevent path traversal)
-	if err := security.ValidatePath(logDir); err != nil {
-		// Fallback to current directory if path is invalid
-		logDir = "."
-	}
-
-	// #nosec G703 -- Path is validated with security.ValidatePath() to prevent traversal
-	// This is a legitimate use case: creating app log directory in user's home/appdata
-	_ = os.MkdirAll(logDir, 0700)
-
-	// Use different log files for GUI and Service to avoid concurrent write issues
-	if IsServiceMode() {
-		debugLogPath = filepath.Join(logDir, "debug-service.log")
-	} else {
-		debugLogPath = filepath.Join(logDir, "debug-gui.log")
-	}
 
 	// Setup panic recovery
 	defer func() {
@@ -188,22 +154,6 @@ func main() {
 	writeDebugLog("Application shutdown normally")
 }
 
-func writeDebugLog(message string) {
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	logLine := fmt.Sprintf("[%s] %s\n", timestamp, message)
-
-	// Write to file
-	f, err := os.OpenFile(debugLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to write debug log: %v\n", err)
-		return
-	}
-	defer func() { _ = f.Close() }()
-	_, _ = f.WriteString(logLine)
-
-	// Also write to stderr for console visibility
-	fmt.Fprint(os.Stderr, logLine)
-}
 
 func writeCrashReport(message string) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
