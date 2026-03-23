@@ -181,10 +181,20 @@ jobs:
           GOWORK: off
         run: wails build -clean -platform windows/amd64 -ldflags "-X main.appVersion=${{ steps.version.outputs.VERSION }}"
 
-      - name: Copy binary to dist
+      - name: Build Service
+        working-directory: cmd/service
+        env:
+          GOWORK: off
+        run: |
+          go mod tidy
+          go build -trimpath -buildmode=pie -ldflags "-s -w -X main.version=${{ steps.version.outputs.VERSION }}" -o ../../gui/build/bin/NimbusBackupSVC.exe
+        shell: pwsh
+
+      - name: Copy binaries to dist
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item gui/build/bin/NimbusBackup.exe dist/
+          Copy-Item gui/build/bin/NimbusBackupSVC.exe dist/
         shell: pwsh
 
       - name: Install WiX Toolset

@@ -7,6 +7,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-23
+
+### Added
+- **Auto-split for large backups** - Intelligent job splitting for backups >100GB
+  - Automatically detects backup size before execution
+  - Confirmation dialog shows total size and suggested split count
+  - Bin-packing algorithm distributes folders into balanced jobs
+  - Each job targets ~100GB max (configurable threshold)
+  - Max 10 jobs per backup to prevent over-fragmentation
+  - Sequential execution with per-job retry capability
+  - Frontend displays progress for each split job
+  - Backend analysis API: `AnalyzeBackup()`, `CreateBackupSplitPlan()`
+  - Example: 864GB backup → 9 jobs of ~96GB each
+
+### Technical
+- **New files:**
+  - `gui/backup_analysis.go` - Core split logic with bin-packing algorithm
+  - `gui/backup_split_api.go` - API exposure to frontend
+- **Modified files:**
+  - `gui/frontend/src/App.jsx` - Auto-detect, confirmation dialog, sequential execution
+- **Constants:**
+  - SplitThreshold: 100GB (when to propose split)
+  - MaxChunkSize: 100GB (target size per job)
+  - Max 10 jobs total
+- **Algorithm:** First-fit-decreasing bin-packing (sorts folders by size, fills jobs sequentially)
+
+### Benefits
+- **Robustness:** If one job fails, only retry ~100GB instead of losing 11+ hours
+- **Speed:** Smaller jobs less likely to hit timeout issues
+- **Transparency:** User sees exactly what will be split and can confirm
+- **Deduplication-friendly:** PBS deduplicates at chunk level, so splitting by folder doesn't affect efficiency
+
+### User Experience
+```
+Backup volumineux détecté (864.5 GB)
+
+Voulez-vous le découper en 9 backups ?
+• Job 1: 96.2 GB (3 dossiers)
+• Job 2: 95.8 GB (4 dossiers)
+...
+• Job 9: 94.1 GB (2 dossiers)
+
+[Oui, découper] [Non, backup unique]
+```
+
+## [0.2.0] - 2026-03-23
+
+### Changed
+- **BREAKING: Binary separation architecture**
+  - GUI and Service now separate executables
+  - `NimbusBackup.exe` - GUI application (Wails v2)
+  - `NimbusBackupSVC.exe` - Windows Service (kardianos/service)
+  - Communication via HTTP API on localhost:18765
+  - Replaces previous single binary with `--service` flag
+
+### Added
+- **HTTP API Server** - Service exposes REST API for GUI communication
+  - Port: 18765 (localhost only)
+  - Endpoints:
+    - `/health` - Service status check
+    - `/config` - Get/update configuration
+    - `/jobs` - List scheduled jobs
+    - `/jobs/create` - Create new job
+    - `/jobs/update` - Update existing job
+    - `/jobs/delete/{id}` - Delete job
+    - `/backup/start` - Execute backup immediately
+  - JSON request/response format
+  - Error handling with HTTP status codes
+
+- **Single instance enforcement** - Prevents multiple GUI instances
+  - Windows mutex: `Global\NimbusBackupGUIMutex`
+  - Activates existing window if already running
+  - `gui/single_instance_windows.go` - Windows-specific implementation
+  - User-friendly behavior (no error dialog, just focus existing window)
+
+### Fixed
+- **Long backup reliability** - Critical keep-alive timeout fix
+  - Changed keep-alive interval from 5 minutes to 30 seconds
+  - Prevents "dynamic writer not registered" HTTP/2 errors
+  - Maintains TCP connection during local file processing pauses
+  - Fixes backup failures after 11+ hours (52-second gaps)
+  - Root cause: Client timeout (~50s) and firewall timeout (~60s)
+  - Solution: Active keep-alive prevents both timeouts
+
+- **MSI installer errors** - Fixed WiX build issues
+  - Removed problematic custom install dialog (InstallDirDlg)
+  - Fixed `LGHT0094: Unresolved reference to WixAction`
+  - Dual binary installation now works correctly
+  - Auto-start registry component with default enabled
+  - Service installed and started automatically
+
+### Technical
+- **New files:**
+  - `cmd/service/main.go` - Standalone service entry point (200+ lines)
+  - `gui/api/server.go` - HTTP API server implementation
+  - `gui/api/client.go` - HTTP client for GUI→Service communication
+  - `gui/single_instance_windows.go` - Mutex-based single instance
+
+- **Removed files:**
+  - `gui/service.go` - Replaced by cmd/service/main.go
+
+- **Modified files:**
+  - `gui/backup_inline.go` - Keep-alive changed to 30 seconds
+  - `installer/wix/Product.wxs` - Dual binary installation
+  - `Makefile` - Added service build target
+
+- **Build process:**
+  ```makefile
+  all: cli gui service
+  service:
+      cd cmd/service && go build -o ../../gui/build/bin/NimbusBackupSVC.exe
+  ```
+
+### Migration Notes
+- **Upgrading from v0.1.x:**
+  - MSI installer handles upgrade automatically
+  - Old single binary replaced with two executables
+  - Service automatically stopped, upgraded, restarted
+  - Configuration preserved in `%ProgramData%\NimbusBackup\`
+  - No user action required
+
+### Root Cause Analysis - Keep-alive Fix
+- **Problem:** Backups failed after 11 hours with "dynamic writer '1' not registered HTTP/2.0"
+- **Evidence:** Client logs showed 52-second gaps between chunk uploads
+- **Cause 1:** Client-side timeout (~50s for idle HTTP/2 connection)
+- **Cause 2:** Firewall timeout (~60s for idle TCP connection)
+- **Trigger:** Local file processing (chunking, hashing) paused uploads for >50s
+- **Previous behavior:** Keep-alive every 5 minutes (300s) - way too long
+- **New behavior:** Keep-alive every 30 seconds - well under both timeout thresholds
+- **Validation:** Gemini analysis confirmed dual timeout hypothesis
+
 ## [0.1.32] - 2026-03-19
 
 ### Fixed
