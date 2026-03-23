@@ -21,11 +21,13 @@ type Server struct {
 
 // BackupHandler interface that the service must implement
 // NOTE: StartBackup will be called in a goroutine (async), so it must be thread-safe
-// TODO: Add progress callback parameters to get real-time progress updates
 type BackupHandler interface {
 	StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool) error
 	GetConfigWithHostname() map[string]interface{}
 	GetScheduledJobsForAPI() []map[string]interface{}
+	SaveScheduledJobFromMap(job map[string]interface{}) error
+	UpdateScheduledJobFromMap(job map[string]interface{}) error
+	DeleteScheduledJobFromMap(jobID string) error
 }
 
 // NewServer creates a new API server
@@ -46,6 +48,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/backup", s.handleBackup)
 	s.mux.HandleFunc("/backup/status/", s.handleBackupStatus)
 	s.mux.HandleFunc("/jobs", s.handleJobs)
+	s.mux.HandleFunc("/jobs/create", s.handleJobCreate)
+	s.mux.HandleFunc("/jobs/update", s.handleJobUpdate)
+	s.mux.HandleFunc("/jobs/delete/", s.handleJobDelete)
 }
 
 // Start starts the HTTP server
@@ -260,6 +265,80 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := JobsResponse{Jobs: jobs}
+	s.writeJSON(w, resp, http.StatusOK)
+}
+
+func (s *Server) handleJobCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var job map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&job); err != nil {
+		s.writeError(w, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if err := s.app.SaveScheduledJobFromMap(job); err != nil {
+		s.writeError(w, fmt.Sprintf("Failed to create job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"success": true,
+		"message": "Job created successfully",
+	}
+	s.writeJSON(w, resp, http.StatusOK)
+}
+
+func (s *Server) handleJobUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var job map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&job); err != nil {
+		s.writeError(w, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if err := s.app.UpdateScheduledJobFromMap(job); err != nil {
+		s.writeError(w, fmt.Sprintf("Failed to update job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"success": true,
+		"message": "Job updated successfully",
+	}
+	s.writeJSON(w, resp, http.StatusOK)
+}
+
+func (s *Server) handleJobDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract job ID from URL path: /jobs/delete/{jobID}
+	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/jobs/delete/"), "/")
+	if len(pathParts) == 0 || pathParts[0] == "" {
+		s.writeError(w, "Job ID required", http.StatusBadRequest)
+		return
+	}
+	jobID := pathParts[0]
+
+	if err := s.app.DeleteScheduledJobFromMap(jobID); err != nil {
+		s.writeError(w, fmt.Sprintf("Failed to delete job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string]interface{}{
+		"success": true,
+		"message": "Job deleted successfully",
+	}
 	s.writeJSON(w, resp, http.StatusOK)
 }
 

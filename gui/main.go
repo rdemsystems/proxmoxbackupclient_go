@@ -93,13 +93,13 @@ func init() {
 func main() {
 	// Parse command line flags
 	minimized := flag.Bool("minimized", false, "Start minimized to system tray")
-	serviceMode := flag.Bool("service", false, "Run as Windows Service")
 	flag.Parse()
 
-	// Check if running as Windows Service
-	if *serviceMode || IsServiceMode() {
-		RunAsService()
-		return
+	// Check for single instance (GUI only)
+	// If another instance exists, activate it and exit
+	if !CheckSingleInstance() {
+		fmt.Println("Another instance is already running. Activating existing window...")
+		os.Exit(0)
 	}
 
 	// Setup panic recovery for main
@@ -251,6 +251,19 @@ func NewApp() *App {
 		stopScheduler: make(chan struct{}),
 		apiClient:     api.NewClient(),
 		callbacksMap:  make(map[string]*progressCallbacks),
+	}
+}
+
+// NewAppForService creates an App instance for Windows Service (no Wails runtime)
+func NewAppForService(ctx context.Context) *App {
+	return &App{
+		ctx:              ctx,
+		config:           LoadConfig(),
+		stopScheduler:    make(chan struct{}),
+		apiClient:        api.NewClient(),
+		mode:             api.ModeStandalone, // Service executes directly
+		callbacksMap:     make(map[string]*progressCallbacks),
+		isServiceProcess: true, // Prevent mode re-detection
 	}
 }
 

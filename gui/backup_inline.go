@@ -471,10 +471,10 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk *atomic.Uint64
 	defer keepAliveCancel() // Stop keep-alive when backup completes or fails
 
 	go func() {
-		ticker := time.NewTicker(5 * time.Minute) // Keep-alive every 5 minutes
+		ticker := time.NewTicker(30 * time.Second) // Keep-alive every 30 seconds
 		defer ticker.Stop()
 
-		writeDebugLog("[KeepAlive] Started - will ping PBS every 5 minutes")
+		writeDebugLog("[KeepAlive] Started - will ping PBS every 30 seconds")
 
 		for {
 			select {

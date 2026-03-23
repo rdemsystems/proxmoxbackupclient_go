@@ -15,7 +15,7 @@ GUI_DIR := gui
 CLI_DIR_BIN := proxmoxbackup-directory
 CLI_MACHINE_BIN := proxmoxbackup-machine
 CLI_NBD_BIN := proxmoxbackup-nbd
-SERVICE_BIN := nimbus-backup-service
+SERVICE_BIN := NimbusBackupSVC
 GUI_BIN := NimbusBackup
 
 # Go build flags (security hardening)
@@ -24,16 +24,17 @@ LDFLAGS := -s -w -X main.version=$(VERSION) \
 	-extldflags '-static-pie -Wl,-z,relro,-z,now'
 
 # Default target
-all: cli gui
+all: cli gui service
 
 help:
 	@echo "Nimbus Backup Build System"
 	@echo "=========================="
 	@echo ""
 	@echo "Targets:"
-	@echo "  all          - Build everything (CLI + GUI)"
+	@echo "  all          - Build everything (CLI + GUI + Service)"
 	@echo "  cli          - Build all CLI tools"
 	@echo "  gui          - Build GUI application"
+	@echo "  service      - Build Windows Service (NimbusBackupSVC.exe)"
 	@echo "  test         - Run all tests"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  install-deps - Install build dependencies"
@@ -86,12 +87,15 @@ else
 	@echo "⏭️  Skipping NBD Server CLI (Linux only)"
 endif
 
-# Service Build
+# Service Build (Standalone Windows Service)
 service:
 	@echo "🔧 Building Backup Service..."
 	@mkdir -p $(BUILD_DIR)
-	cd service && go mod tidy && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
-		-o ../$(BUILD_DIR)/$(SERVICE_BIN)$(shell go env GOEXE)
+	@mkdir -p gui/build/bin
+	cd cmd/service && go mod tidy && go build $(GO_FLAGS) -ldflags="$(LDFLAGS)" \
+		-o ../../gui/build/bin/$(SERVICE_BIN)$(shell go env GOEXE)
+	@cp gui/build/bin/$(SERVICE_BIN)$(shell go env GOEXE) $(BUILD_DIR)/ || true
+	@echo "✅ Built: gui/build/bin/$(SERVICE_BIN) (for MSI)"
 	@echo "✅ Built: $(BUILD_DIR)/$(SERVICE_BIN)"
 
 # GUI Build

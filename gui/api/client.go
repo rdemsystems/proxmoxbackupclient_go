@@ -147,3 +147,74 @@ func (c *Client) GetJobs() (*JobsResponse, error) {
 
 	return &jobs, nil
 }
+
+// CreateJob creates a new scheduled job
+func (c *Client) CreateJob(job map[string]interface{}) error {
+	body, err := json.Marshal(job)
+	if err != nil {
+		return fmt.Errorf("failed to encode job: %w", err)
+	}
+
+	resp, err := c.httpClient.Post(
+		c.baseURL+"/jobs/create",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create job: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create job: %s", string(respBody))
+	}
+
+	return nil
+}
+
+// UpdateJob updates an existing scheduled job
+func (c *Client) UpdateJob(job map[string]interface{}) error {
+	body, err := json.Marshal(job)
+	if err != nil {
+		return fmt.Errorf("failed to encode job: %w", err)
+	}
+
+	resp, err := c.httpClient.Post(
+		c.baseURL+"/jobs/update",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update job: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update job: %s", string(respBody))
+	}
+
+	return nil
+}
+
+// DeleteJob deletes a scheduled job by ID
+func (c *Client) DeleteJob(jobID string) error {
+	req, err := http.NewRequest(http.MethodDelete, c.baseURL+"/jobs/delete/"+jobID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete job: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete job: %s", string(respBody))
+	}
+
+	return nil
+}
