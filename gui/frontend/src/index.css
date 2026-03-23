@@ -483,3 +483,24 @@ body {
         -webkit-app-region: no-drag;
     }
 }
+
+/* Ultra small screens - compact mode */
+@media (max-width: 480px) {
+    /* Hide long text, show only icons/short text */
+    .compact-text-long {
+        display: none;
+    }
+    
+    .compact-text-short {
+        display: inline;
+    }
+}
+
+/* Default: show long text */
+.compact-text-short {
+    display: none;
+}
+
+.compact-text-long {
+    display: inline;
+}

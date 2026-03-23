@@ -1187,7 +1187,8 @@ function App() {
                   fontWeight: 'bold'
                 }}
               >
-                ⚡ One-shot (maintenant)
+                <span className="compact-text-long">⚡ One-shot (maintenant)</span>
+                <span className="compact-text-short">⚡ Now</span>
               </button>
               <button
                 onClick={() => setBackupMode('scheduled')}
@@ -1202,7 +1203,8 @@ function App() {
                   fontWeight: 'bold'
                 }}
               >
-                📅 Planifié
+                <span className="compact-text-long">📅 Planifié</span>
+                <span className="compact-text-short">📅 Schedule</span>
               </button>
             </div>
           </div>

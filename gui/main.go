@@ -141,8 +141,8 @@ func main() {
 		Title:     fmt.Sprintf("%s v%s", appName, appVersion),
 		Width:     1200,
 		Height:    800,
-		MinWidth:  600,  // Minimum width to ensure UI elements are visible
-		MinHeight: 500,  // Minimum height to prevent content overflow
+		MinWidth:  400,  // Allow very small windows for low-res screens
+		MinHeight: 300,  // Allow very small windows for low-res screens
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
