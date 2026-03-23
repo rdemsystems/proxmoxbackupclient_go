@@ -81,6 +81,10 @@
 
 ## 📜 Changelog récent
 
+### v0.2.12 (2026-03-23)
+- **FIX**: Better responsive design for very small screens (400x300 min, adaptive text)
+- **UX**: Works on VM displays and low-resolution screens (800x600, Proxmox VE console)
+
 ### v0.2.11 (2026-03-23)
 - **FIX**: UI overflow on small screens - Added minimum window size (600x500)
 - **UX**: Better usability on low-resolution displays
@@ -458,5 +462,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.2.11
+**Version actuelle:** 0.2.12
 **Dernière mise à jour:** 2026-03-23

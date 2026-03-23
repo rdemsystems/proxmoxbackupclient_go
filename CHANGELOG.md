@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-03-23
+
+### Fixed
+- **Better responsive design for very small screens** - Improved approach for low-res displays
+  - Reduced MinWidth from 600 to 400 (supports 800x600 and smaller screens)
+  - Reduced MinHeight from 500 to 300 (supports low-resolution displays)
+  - Added compact text mode for buttons on screens <480px
+  - Button text adapts: "One-shot (maintenant)" → "Now" on small screens
+  - Works on VM displays, low-res screens, and Proxmox VE console
+
+### Improved
+- Truly responsive UI that adapts to any screen size
+- No forced minimum that could exceed screen resolution
+
 ## [0.2.11] - 2026-03-23
 
 ### Fixed
