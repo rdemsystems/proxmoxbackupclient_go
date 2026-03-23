@@ -182,12 +182,11 @@ jobs:
         run: wails build -clean -platform windows/amd64 -ldflags "-X main.appVersion=${{ steps.version.outputs.VERSION }}"
 
       - name: Build Service
-        working-directory: cmd/service
+        working-directory: gui
         env:
           GOWORK: off
         run: |
-          go mod tidy
-          go build -trimpath -buildmode=pie -ldflags "-s -w -X main.version=${{ steps.version.outputs.VERSION }}" -o ../../gui/build/bin/NimbusBackupSVC.exe
+          go build -tags service -trimpath -buildmode=pie -ldflags "-s -w -X main.appVersion=${{ steps.version.outputs.VERSION }}" -o build/bin/NimbusBackupSVC.exe
         shell: pwsh
 
       - name: Copy binaries to dist
