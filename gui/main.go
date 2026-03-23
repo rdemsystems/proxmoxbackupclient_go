@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
