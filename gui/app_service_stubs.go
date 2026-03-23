@@ -30,11 +30,53 @@ func (a *App) GetConfigWithHostname() map[string]interface{} {
 }
 
 // StartBackup starts a backup job
-// This is a stub that delegates to the appropriate implementation
+// Service implementation using RunBackupInline
 func (a *App) StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool) error {
-	writeDebugLog(fmt.Sprintf("StartBackup stub called: type=%s, dirs=%v, id=%s, vss=%v", backupType, backupDirs, backupID, useVSS))
+	writeDebugLog(fmt.Sprintf("[Service] StartBackup called: type=%s, dirs=%v, id=%s, vss=%v", backupType, backupDirs, backupID, useVSS))
 
-	// For service mode, we need the real implementation
-	// This will be overridden by the full implementation in backup.go
-	return fmt.Errorf("StartBackup not fully implemented in service stub")
+	if a.config == nil {
+		return fmt.Errorf("configuration not loaded")
+	}
+
+	// Use hostname as fallback if backupID is empty
+	if backupID == "" {
+		backupID, _ = os.Hostname()
+		writeDebugLog(fmt.Sprintf("[Backup ID] Empty backup-id, using hostname: %s", backupID))
+	}
+
+	// Merge directories: backupDirs for directory backup, driveLetters for machine backup
+	var allDirs []string
+	if backupType == "directory" {
+		allDirs = backupDirs
+	} else if backupType == "machine" {
+		allDirs = driveLetters
+	}
+
+	// Prepare backup options
+	opts := BackupOptions{
+		BaseURL:         a.config.BaseURL,
+		AuthID:          a.config.AuthID,
+		Secret:          a.config.Secret,
+		Datastore:       a.config.Datastore,
+		Namespace:       a.config.Namespace,
+		CertFingerprint: a.config.CertFingerprint,
+		BackupDirs:      allDirs,
+		BackupID:        backupID,
+		BackupType:      backupType,
+		UseVSS:          useVSS,
+		OnProgress: func(percent float64, message string) {
+			writeDebugLog(fmt.Sprintf("[Backup Progress] %.1f%% - %s", percent, message))
+		},
+		OnComplete: func(success bool, message string) {
+			if success {
+				writeDebugLog(fmt.Sprintf("[Backup Complete] SUCCESS - %s", message))
+			} else {
+				writeDebugLog(fmt.Sprintf("[Backup Complete] FAILED - %s", message))
+			}
+		},
+	}
+
+	// Execute backup using inline implementation
+	writeDebugLog("[Service] Executing backup via RunBackupInline")
+	return RunBackupInline(opts)
 }
