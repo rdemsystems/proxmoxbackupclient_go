@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-03-23
+
+### Changed
+- **Release notes consolidation** - Complete release notes since v0.2.0
+  - Added comprehensive feature summary for v0.2.0 → v0.2.3
+  - Detailed statistics and examples showing impact of each feature
+  - Migration notes for v0.1.x → v0.2.x upgrades
+  - Backup strategy recommendations (file-mode vs disk-mode)
+  - Before/after comparisons for major fixes
+
+### Documentation
+- **RELEASE_NOTES.md** - Major restructuring with complete v0.2.x summary
+  - Architecture changes (binary separation, HTTP API)
+  - Long backup reliability (keep-alive fix)
+  - Auto-split feature (large backups >100GB)
+  - Smart system exclusions (VSS snapshots, paging files)
+  - Real-world examples and statistics
+
 ## [0.2.2] - 2026-03-23
 
 ### Added

@@ -81,6 +81,122 @@
 
 ## 📜 Changelog récent
 
+### v0.2.3 (2026-03-23) - Complete Release Since v0.2.0
+
+#### 🎯 Major Features (v0.2.0 → v0.2.3)
+
+**Binary Separation Architecture (v0.2.0)**
+- **BREAKING**: Separate GUI and Service executables
+  - `NimbusBackup.exe` - GUI application (Wails v2)
+  - `NimbusBackupSVC.exe` - Windows Service (kardianos/service)
+- **HTTP API** on localhost:18765 for GUI-Service communication
+- **Single instance enforcement** with Windows mutex
+- **MSI installer** with dual binary support and automatic service installation
+
+**Long Backup Reliability (v0.2.0)**
+- **CRITICAL FIX**: Keep-alive interval changed from 5 minutes to 30 seconds
+- Prevents "dynamic writer not registered" HTTP/2 errors after 11+ hour backups
+- Maintains TCP connection during local file processing pauses (chunking, hashing)
+- Fixes both client timeout (~50s) and firewall timeout (~60s)
+
+**Auto-Split for Large Backups (v0.2.1)**
+- Intelligent job splitting for backups >100GB threshold
+- Bin-packing algorithm distributes folders into balanced jobs (~100GB each)
+- Confirmation dialog shows total size and suggested split count
+- Sequential execution with per-job retry capability
+- **Benefit**: If one job fails, only retry ~100GB instead of losing 11+ hours
+- Max 10 jobs per backup to prevent over-fragmentation
+
+**Smart System Exclusions (v0.2.2 & v0.2.3)**
+- **Auto-exclusion of Windows system folders**:
+  - `System Volume Information` - VSS snapshots storage (can be 100+ GB)
+  - `$RECYCLE.BIN` - Windows recycle bin
+  - `Recovery` - Windows recovery partition data
+- **Auto-exclusion of Windows system files**:
+  - `pagefile.sys`, `hiberfil.sys`, `swapfile.sys`
+  - `DumpStack.log.tmp` (crash dump temporary)
+- **Impact**: Backup size matches actual files instead of including hidden system data
+- **Example**: Drive shows 1.03 TB used but files are 141 GB → backup will be ~141 GB
+
+#### 🐛 Bug Fixes
+
+**v0.2.3**
+- Auto-exclude Windows system folders/files in file-mode backups
+
+**v0.2.2**
+- CI/CD build error - Service executable not built before MSI creation
+- LGHT0103 error resolved (missing NimbusBackupSVC.exe)
+
+**v0.2.0**
+- MSI upgrade schedule fixed (afterInstallInitialize)
+- Service stop mechanism during upgrades
+- Kill GUI processes before upgrade to prevent hang
+
+#### 🏗️ Architecture Changes
+
+**HTTP API Endpoints** (v0.2.0)
+- `/health` - Service status check
+- `/config` - Get/update configuration
+- `/jobs` - List scheduled jobs
+- `/jobs/create`, `/jobs/update`, `/jobs/delete/{id}` - Job management
+- `/backup/start` - Execute backup immediately
+
+**Build System** (v0.2.2)
+- GitHub Actions workflow builds service before MSI packaging
+- Both binaries (GUI + Service) copied to dist/ folder
+
+#### 📊 Statistics & Examples
+
+**Before v0.2.0:**
+- 11-hour backup fails after 52 seconds of local processing
+- Error: "dynamic writer '1' not registered HTTP/2.0"
+
+**After v0.2.0:**
+- Keep-alive every 30 seconds prevents timeout
+- 11+ hour backups complete successfully
+
+**Before v0.2.1:**
+- 864 GB backup = single job
+- If it fails at 99%, lose 11 hours of work
+
+**After v0.2.1:**
+- 864 GB backup = 9 jobs of ~96 GB each
+- If one fails, only retry that ~100 GB chunk
+
+**Before v0.2.3:**
+- Backing up `D:\` includes 890 GB of VSS snapshots
+- Total backup: 1.03 TB (141 GB files + 890 GB snapshots)
+
+**After v0.2.3:**
+- VSS snapshots auto-excluded
+- Total backup: ~141 GB (actual files only)
+
+#### 🔧 Migration Notes
+
+**Upgrading from v0.1.x to v0.2.x:**
+- MSI installer handles upgrade automatically
+- Old single binary replaced with two executables
+- Service automatically stopped, upgraded, restarted
+- Configuration preserved in `%ProgramData%\NimbusBackup\`
+- No user action required
+
+#### 📝 Recommendations
+
+**Backup Strategy:**
+- **File-level backups** (default): Use file mode with auto-exclusions
+  - Excludes VSS snapshots, recycle bin, paging files
+  - Faster, smaller, suitable for file/folder restore
+- **Bare-metal restore**: Use disk mode in separate job
+  - Includes everything (boot sector, system files, etc.)
+  - Suitable for full system recovery
+
+**Large Backups (>100 GB):**
+- Accept auto-split suggestion when prompted
+- Each job ~100 GB max for better reliability
+- Per-job retry instead of all-or-nothing
+
+---
+
 ### v0.2.2 (2026-03-23)
 - **FEATURE**: Auto-exclusion of Windows system folders (System Volume Information, $RECYCLE.BIN, Recovery)
 - **FEATURE**: Auto-exclusion of Windows system files (pagefile.sys, hiberfil.sys, swapfile.sys)
@@ -312,5 +428,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.2.2
+**Version actuelle:** 0.2.3
 **Dernière mise à jour:** 2026-03-23
