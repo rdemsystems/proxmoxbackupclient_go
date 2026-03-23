@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-03-23
+
+### Note
+- Re-release of v0.2.4 with proper build sequence
+- All functionality identical to v0.2.4
+- Fixes tag timing issue
+
 ## [0.2.4] - 2026-03-23
 
 ### Fixed

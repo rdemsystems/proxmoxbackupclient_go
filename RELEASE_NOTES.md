@@ -81,6 +81,9 @@
 
 ## 📜 Changelog récent
 
+### v0.2.5 (2026-03-23)
+- Re-release of v0.2.4 with proper build sequence (no functional changes)
+
 ### v0.2.4 (2026-03-23)
 - **FIX**: Service build error in CI/CD - Missing replace directives
 - **FIX**: Malformed module path errors for local modules resolved
@@ -433,5 +436,5 @@ Older versions - see git history
 
 ---
 
-**Version actuelle:** 0.2.4
+**Version actuelle:** 0.2.5
 **Dernière mise à jour:** 2026-03-23
