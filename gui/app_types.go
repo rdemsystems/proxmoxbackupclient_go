@@ -20,6 +20,7 @@ func init() {
 		programData = "C:\\ProgramData"
 	}
 	logDir := filepath.Join(programData, "NimbusBackup")
+	// #nosec G703 -- ProgramData is a trusted Windows system environment variable, not user input
 	_ = os.MkdirAll(logDir, 0700)
 	debugLogPath = filepath.Join(logDir, "debug-gui.log")
 }
