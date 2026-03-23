@@ -10,21 +10,29 @@ import (
 )
 
 type Config struct {
-	// PBS Connection
-	BaseURL         string `json:"baseurl"`
-	CertFingerprint string `json:"certfingerprint"`
-	AuthID          string `json:"authid"`
-	Secret          string `json:"secret"`
-	Datastore       string `json:"datastore"`
-	Namespace       string `json:"namespace"`
+	// ==================== MULTI-PBS SUPPORT ====================
+	// New: Map of PBS servers (key = server ID, value = server config)
+	PBSServers map[string]*PBSServer `json:"pbs_servers,omitempty"`
+	// Default PBS server ID to use when none is specified
+	DefaultPBSID string `json:"default_pbs_id,omitempty"`
 
-	// Backup Settings
-	BackupDir      string   `json:"backupdir"`
-	BackupID       string   `json:"backup-id"`
+	// ==================== LEGACY SINGLE PBS (Deprecated) ====================
+	// These fields are kept for backward compatibility with existing config.json
+	// When loaded, they are automatically migrated to PBSServers["default"]
+	BaseURL         string `json:"baseurl,omitempty"`
+	CertFingerprint string `json:"certfingerprint,omitempty"`
+	AuthID          string `json:"authid,omitempty"`
+	Secret          string `json:"secret,omitempty"`
+	Datastore       string `json:"datastore,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+
+	// ==================== BACKUP SETTINGS ====================
+	BackupDir      string   `json:"backupdir,omitempty"`
+	BackupID       string   `json:"backup-id,omitempty"`
 	UseVSS         bool     `json:"usevss"`
 	LastBackupDirs []string `json:"last_backup_dirs,omitempty"` // Remember last used directories
 
-	// Email Notifications (optional)
+	// ==================== EMAIL NOTIFICATIONS ====================
 	SMTPHost     string `json:"smtp_host,omitempty"`
 	SMTPPort     string `json:"smtp_port,omitempty"`
 	SMTPUsername string `json:"smtp_username,omitempty"`
@@ -64,7 +72,8 @@ func getConfigPath() (string, error) {
 
 func LoadConfig() *Config {
 	config := &Config{
-		UseVSS: true, // Default to VSS enabled on Windows
+		UseVSS:     true, // Default to VSS enabled on Windows
+		PBSServers: make(map[string]*PBSServer),
 	}
 
 	configPath, err := getConfigPath()
@@ -80,6 +89,40 @@ func LoadConfig() *Config {
 
 	if err := json.Unmarshal(data, config); err != nil {
 		return config
+	}
+
+	// ==================== AUTO-MIGRATION ====================
+	// If legacy single PBS config exists (BaseURL not empty) and PBSServers is empty,
+	// migrate to multi-PBS format automatically
+	if config.BaseURL != "" && len(config.PBSServers) == 0 {
+		// Create default PBS server from legacy config
+		defaultPBS := &PBSServer{
+			ID:              "default",
+			Name:            "Serveur PBS Principal",
+			BaseURL:         config.BaseURL,
+			CertFingerprint: config.CertFingerprint,
+			AuthID:          config.AuthID,
+			Secret:          config.Secret,
+			Datastore:       config.Datastore,
+			Namespace:       config.Namespace,
+			Description:     "Serveur PBS par défaut (migré depuis ancienne config)",
+		}
+
+		// Initialize PBSServers map if nil
+		if config.PBSServers == nil {
+			config.PBSServers = make(map[string]*PBSServer)
+		}
+
+		config.PBSServers["default"] = defaultPBS
+		config.DefaultPBSID = "default"
+
+		// Save migrated config immediately
+		_ = config.Save()
+	}
+
+	// Ensure PBSServers map is initialized
+	if config.PBSServers == nil {
+		config.PBSServers = make(map[string]*PBSServer)
 	}
 
 	return config
@@ -151,4 +194,116 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// ==================== MULTI-PBS HELPER METHODS ====================
+
+// GetPBSServer returns a PBS server by ID, or the default if ID is empty
+func (c *Config) GetPBSServer(id string) (*PBSServer, error) {
+	// If no ID specified, use default
+	if id == "" {
+		id = c.DefaultPBSID
+	}
+
+	// If still empty and only one server exists, use it
+	if id == "" && len(c.PBSServers) == 1 {
+		for _, pbs := range c.PBSServers {
+			return pbs, nil
+		}
+	}
+
+	// If still empty, return error
+	if id == "" {
+		return nil, fmt.Errorf("aucun serveur PBS spécifié et pas de serveur par défaut")
+	}
+
+	// Get server by ID
+	pbs, exists := c.PBSServers[id]
+	if !exists {
+		return nil, fmt.Errorf("serveur PBS '%s' introuvable", id)
+	}
+
+	return pbs, nil
+}
+
+// AddPBSServer adds a new PBS server to the configuration
+func (c *Config) AddPBSServer(pbs *PBSServer) error {
+	if err := pbs.Validate(); err != nil {
+		return err
+	}
+
+	if c.PBSServers == nil {
+		c.PBSServers = make(map[string]*PBSServer)
+	}
+
+	// Check if ID already exists
+	if _, exists := c.PBSServers[pbs.ID]; exists {
+		return fmt.Errorf("serveur PBS avec ID '%s' existe déjà", pbs.ID)
+	}
+
+	c.PBSServers[pbs.ID] = pbs
+
+	// If this is the first server, set it as default
+	if len(c.PBSServers) == 1 {
+		c.DefaultPBSID = pbs.ID
+	}
+
+	return c.Save()
+}
+
+// UpdatePBSServer updates an existing PBS server
+func (c *Config) UpdatePBSServer(pbs *PBSServer) error {
+	if err := pbs.Validate(); err != nil {
+		return err
+	}
+
+	if _, exists := c.PBSServers[pbs.ID]; !exists {
+		return fmt.Errorf("serveur PBS '%s' introuvable", pbs.ID)
+	}
+
+	c.PBSServers[pbs.ID] = pbs
+	return c.Save()
+}
+
+// DeletePBSServer removes a PBS server from the configuration
+func (c *Config) DeletePBSServer(id string) error {
+	if _, exists := c.PBSServers[id]; !exists {
+		return fmt.Errorf("serveur PBS '%s' introuvable", id)
+	}
+
+	delete(c.PBSServers, id)
+
+	// If we deleted the default server, pick a new default
+	if c.DefaultPBSID == id {
+		if len(c.PBSServers) > 0 {
+			// Pick the first available server as new default
+			for newDefaultID := range c.PBSServers {
+				c.DefaultPBSID = newDefaultID
+				break
+			}
+		} else {
+			c.DefaultPBSID = ""
+		}
+	}
+
+	return c.Save()
+}
+
+// ListPBSServers returns all configured PBS servers
+func (c *Config) ListPBSServers() []*PBSServer {
+	servers := make([]*PBSServer, 0, len(c.PBSServers))
+	for _, pbs := range c.PBSServers {
+		servers = append(servers, pbs)
+	}
+	return servers
+}
+
+// SetDefaultPBS sets the default PBS server ID
+func (c *Config) SetDefaultPBS(id string) error {
+	if _, exists := c.PBSServers[id]; !exists {
+		return fmt.Errorf("serveur PBS '%s' introuvable", id)
+	}
+
+	c.DefaultPBSID = id
+	return c.Save()
 }

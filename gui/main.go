@@ -496,6 +496,65 @@ func (a *App) ReloadConfig() {
 	writeDebugLog("Config reloaded from disk")
 }
 
+// ==================== MULTI-PBS MANAGEMENT ====================
+
+// ListPBSServers returns all configured PBS servers
+func (a *App) ListPBSServers() []*PBSServer {
+	writeDebugLog(fmt.Sprintf("ListPBSServers() returned %d servers", len(a.config.PBSServers)))
+	return a.config.ListPBSServers()
+}
+
+// GetPBSServer returns a single PBS server by ID
+func (a *App) GetPBSServer(id string) (*PBSServer, error) {
+	writeDebugLog(fmt.Sprintf("GetPBSServer(%s) called", id))
+	return a.config.GetPBSServer(id)
+}
+
+// AddPBSServer adds a new PBS server to the configuration
+func (a *App) AddPBSServer(pbs *PBSServer) error {
+	writeDebugLog(fmt.Sprintf("AddPBSServer(%s) called", pbs.ID))
+	return a.config.AddPBSServer(pbs)
+}
+
+// UpdatePBSServer updates an existing PBS server
+func (a *App) UpdatePBSServer(pbs *PBSServer) error {
+	writeDebugLog(fmt.Sprintf("UpdatePBSServer(%s) called", pbs.ID))
+	return a.config.UpdatePBSServer(pbs)
+}
+
+// DeletePBSServer removes a PBS server
+func (a *App) DeletePBSServer(id string) error {
+	writeDebugLog(fmt.Sprintf("DeletePBSServer(%s) called", id))
+	return a.config.DeletePBSServer(id)
+}
+
+// SetDefaultPBSServer sets the default PBS server
+func (a *App) SetDefaultPBSServer(id string) error {
+	writeDebugLog(fmt.Sprintf("SetDefaultPBSServer(%s) called", id))
+	return a.config.SetDefaultPBS(id)
+}
+
+// GetDefaultPBSID returns the default PBS server ID
+func (a *App) GetDefaultPBSID() string {
+	return a.config.DefaultPBSID
+}
+
+// TestPBSConnection tests connection to a specific PBS server
+func (a *App) TestPBSConnection(pbsID string) error {
+	writeDebugLog(fmt.Sprintf("TestPBSConnection(%s) called", pbsID))
+
+	pbs, err := a.config.GetPBSServer(pbsID)
+	if err != nil {
+		return err
+	}
+
+	// Convert to legacy Config format for existing TestConnection logic
+	legacyConfig := pbs.ToConfig()
+	return a.TestConnection(legacyConfig)
+}
+
+// ==================== END MULTI-PBS MANAGEMENT ====================
+
 // StartBackup starts a backup operation (routes to service or direct based on mode)
 func (a *App) StartBackup(backupType string, backupDirs []string, driveLetters []string, excludeList []string, backupID string, useVSS bool) error {
 	writeDebugLog(fmt.Sprintf("StartBackup() called - mode: %s, VSS: %v, isServiceProcess: %v", a.mode.String(), useVSS, a.isServiceProcess))

@@ -1,70 +1,65 @@
 # Nimbus Backup - TODO
 
-## 🔴 P0 - CRITIQUE (En cours)
+## ✅ RÉCEMMENT COMPLÉTÉES (v0.1.78-v0.1.92)
 
-### Fix Bug Config Service (URGENT)
-**Problème:** Service charge config au démarrage, ne recharge jamais → backup échoue si config change
-
+### ~~Fix Bug Config Service~~ ✅ RÉSOLU (v0.1.81)
 - [x] ~~HTTP API existe~~ ✓ (`gui/api/server.go`)
 - [x] ~~Service Windows fonctionne~~ ✓ (`gui/service.go`)
-- [ ] **ReloadConfig avant backup** (PATCH EN COURS)
-  - [x] Méthode `ReloadConfig()` ajoutée dans App
-  - [x] `handleBackup()` appelle `ReloadConfig()` avant backup
-  - [ ] Test: Sauvegarder config → Backup → Utilise nouvelle config
-  - [ ] Rebuild + MSI + test sur Windows
+- [x] ~~ReloadConfig avant backup~~ ✓ (v0.1.81)
+- [x] ~~Scheduled backups~~ ✓ (v0.1.85+)
+- [x] ~~System tray~~ ✓ (v0.1.80+)
+- [x] ~~MSI installer~~ ✓ (v0.1.70+)
+- [x] ~~Logs séparés GUI/Service~~ ✓ (v0.1.78+)
 
-**Temps estimé:** 1h (rebuild + test)
+---
 
-### Multi-PBS Architecture (FEATURE MORTELLE 🚀)
+## ✅ RÉCEMMENT COMPLÉTÉES (2026-03-23)
+
+### ~~VSS Cleanup au démarrage~~ ✅ RÉSOLU
+- [x] ~~Fonction cleanupVSS() Windows~~ ✓ (`service/vss_cleanup_windows.go`)
+- [x] ~~Appel au démarrage du service~~ ✓ (`service/main.go`)
+- [x] ~~Log des snapshots supprimés~~ ✓
+- [x] ~~Build tags Windows/autres plateformes~~ ✓
+
+### ~~Multi-PBS Architecture~~ ✅ IMPLÉMENTÉ (Backend complet)
+- [x] ~~Structure PBSServer avec validation~~ ✓ (`gui/pbs_server.go`)
+- [x] ~~Config.PBSServers map~~ ✓ (`gui/config.go`)
+- [x] ~~Migration auto legacy → multi-PBS~~ ✓
+- [x] ~~CRUD methods (Add/Update/Delete/List)~~ ✓
+- [x] ~~Job.PBSID référence serveur~~ ✓ (`gui/jobs.go`)
+- [x] ~~Méthodes App exposées au frontend~~ ✓ (`gui/main.go`)
+- [x] ~~Documentation complète~~ ✓ (`MULTI_PBS_GUIDE.md`)
+- [ ] **Frontend GUI à développer** (liste serveurs, dropdown jobs)
+
+### ~~MSI Uninstall Dialog~~ ✅ IMPLÉMENTÉ
+- [x] ~~Propriété KEEP_CONFIG~~ ✓ (`installer/wix/Product.wxs`)
+- [x] ~~Custom action DeleteConfigFolder~~ ✓
+- [x] ~~Dialog personnalisé avec radio buttons~~ ✓
+- [x] ~~Documentation tests~~ ✓ (`MSI_UNINSTALL_TEST.md`)
+- [ ] **Tests sur Windows à faire**
+
+---
+
+## 🔴 P0 - CRITIQUE (À faire maintenant)
+
+### ~~Multi-PBS Architecture~~ ✅ BACKEND COMPLET (2026-03-23)
 **Use case:** Multi-datastore (C:\ → bigdata, C:\Users → ssd) + GUI distante
 
-- [ ] **Config Multi-PBS**
-  ```json
-  {
-    "pbs_servers": {
-      "pbs1": { "name": "Big Data", "baseurl": "...", "datastore": "bigdata" },
-      "pbs2": { "name": "SSD Fast", "baseurl": "...", "datastore": "ssd" }
-    },
-    "backup_id_template": "{{hostname}}", // Ou custom
-    "default_pbs": "pbs1"
-  }
-  ```
-  - [ ] Structure config avec map de PBS
-  - [ ] Validation: au moins 1 PBS configuré
-  - [ ] Migration: config actuelle → pbs_servers["default"]
+Backend implémenté :
+- [x] ~~Structure config avec map de PBS~~ ✓
+- [x] ~~Validation: au moins 1 PBS configuré~~ ✓
+- [x] ~~Migration: config actuelle → pbs_servers["default"]~~ ✓
+- [x] ~~Jobs référencent PBS par ID~~ ✓
+- [x] ~~CRUD API exposée (Add/Update/Delete/List)~~ ✓
+- [x] ~~Documentation complète~~ ✓ (MULTI_PBS_GUIDE.md)
 
-- [ ] **BackupRequest avec PBS ID**
-  ```go
-  type BackupRequest struct {
-      PBSID       string   `json:"pbs_id"`        // "pbs1", "pbs2"
-      BackupType  string   `json:"backup_type"`
-      BackupDirs  []string `json:"backup_dirs"`
-      BackupID    string   `json:"backup_id"`
-      UseVSS      bool     `json:"use_vss"`
-      ExcludeList []string `json:"exclude_list"`
-  }
-  ```
-  - [ ] API: Accepter `pbs_id` dans requête
-  - [ ] Service: Charger config du PBS correspondant
-  - [ ] Fallback: Si `pbs_id` vide → utiliser `default_pbs`
+**Frontend à développer** (2-3 jours) :
+- [ ] Page "Serveurs PBS" (liste avec CRUD)
+- [ ] Dropdown "Serveur PBS" dans formulaire backup
+- [ ] Test connexion par PBS (bouton + indicateur 🟢/🔴)
+- [ ] Migration jobs legacy vers PBSID
 
-- [ ] **Jobs gérés par Service** (pas GUI)
-  - [ ] Jobs stockés dans service (`C:\ProgramData\Nimbus\jobs.json`)
-  - [ ] Chaque job → 1 PBS spécifique
-  - [ ] **Rechargement jobs** : Service relit `jobs.json` avant chaque exécution
-  - [x] Config auto-reload avant backup ✓ (v0.1.81)
-  - [ ] **API Reload** : `POST /api/reload/config` et `POST /api/reload/jobs`
-  - [ ] GUI peut éditer, déclencher reload, service répond OK
-  - [ ] API: `POST /jobs` (créer), `PUT /jobs/{id}` (modifier), `DELETE /jobs/{id}`
-  - [ ] GUI distante peut provisionner le service via API
-
-- [ ] **GUI Multi-PBS**
-  - [ ] Dropdown "Serveur PBS" dans formulaire backup
-  - [ ] Gestion PBS: Ajouter/Modifier/Supprimer serveurs
-  - [ ] Test connexion par PBS
-  - [ ] Indicateur: 🟢 Online / 🔴 Offline par PBS
-
-**Temps estimé:** 1-2 semaines (grosse feature!)
+**Temps estimé:** 2-3 jours frontend
 
 ---
 
@@ -75,14 +70,10 @@
 ## 🟠 P1 - IMPORTANT (Prochaines semaines)
 
 ### Service Windows - Robustesse
-- [ ] **VSS Cleanup au démarrage**
-  ```go
-  func cleanupOrphanedVSS() {
-      exec.Command("vssadmin", "delete", "shadows", "/for=C:", "/all", "/quiet").Run()
-  }
-  ```
-  - [ ] Appel dans `service.Start()`
-  - [ ] Log les shadows supprimées
+- [x] ~~**VSS Cleanup au démarrage**~~ ✅ FAIT (2026-03-23)
+  - [x] ~~Appel dans `service.run()`~~ ✓
+  - [x] ~~Log les shadows supprimées~~ ✓
+  - [x] ~~Build tags Windows/Linux~~ ✓
 
 - [ ] **Working Directory fix**
   ```go
@@ -98,6 +89,12 @@
   - [ ] Rotation: max 10 MB par fichier
 
 ### MSI - Finitions
+
+- [x] ~~**Désinstallation avec choix config**~~ ✅ FAIT (2026-03-23)
+  - [x] ~~Dialog WiX personnalisé~~ ✓
+  - [x] ~~Propriété KEEP_CONFIG~~ ✓
+  - [x] ~~CustomAction DeleteConfigFolder~~ ✓
+  - [ ] **Tests sur Windows à faire**
 
 - [ ] **Installation Silencieuse (Silent Install)**
   - [ ] **Approche: Config JSON pré-configuré** (propre pour AD/GPO)
@@ -220,16 +217,11 @@
   - [ ] Checkbox "Activer chiffrement"
   - [ ] Warning: "Sans la clé, restauration impossible!"
 
-### Restauration locale (Phase 4)
-- [ ] **Navigateur de snapshots**
-  - [ ] Liste des snapshots depuis PBS
-  - [ ] Parcourir le catalog (lazy loading)
-  - [ ] Sélection fichiers/dossiers
-
-- [ ] **Download & Restore**
-  - [ ] Bouton "Restaurer vers..."
-  - [ ] Gestion conflits (Écraser/Renommer)
-  - [ ] Extraction via service (droits admin)
+### ~~Restauration locale~~ ❌ HORS SCOPE
+**Décision:** La restauration est déléguée au portail web [members.rdem-systems.com](https://members.rdem-systems.com)
+- Les clients Nimbus utilisent l'interface PBS hébergée pour restaurer
+- Pas de restauration dans le client desktop
+- Cette section est retirée de la roadmap
 
 ### Mode Entreprise (Phase 5)
 **→ DÉPLACÉ EN P1** (voir "API Remote - Provisioning Distant")

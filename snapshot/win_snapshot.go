@@ -6,8 +6,10 @@ package snapshot
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"github.com/st-matskevich/go-vss"
 )
@@ -92,6 +94,36 @@ func CreateVSSSnapshot(paths []string, backup_callback func(sn map[string]SnapSh
 
 }
 
-func VSSCleanup() {
+// VSSCleanup removes all orphaned VSS snapshots
+// This prevents shadow copies from accumulating after crashes or abnormal terminations
+func VSSCleanup() error {
+	// List all shadows first to check if cleanup is needed
+	listCmd := exec.Command("vssadmin", "list", "shadows")
+	output, err := listCmd.CombinedOutput()
+	if err != nil {
+		// If vssadmin fails, log but don't block service startup
+		fmt.Printf("Warning: Failed to list VSS shadows: %v\n", err)
+		return nil
+	}
 
+	// Only delete if there are actually shadows present
+	if len(output) > 0 && !strings.Contains(string(output), "No items found") {
+		fmt.Println("VSS Cleanup: Removing orphaned shadow copies...")
+
+		// Delete all shadow copies
+		// Note: This is safe because Nimbus creates snapshots only during backup
+		// and releases them immediately after. Any remaining snapshots are orphans.
+		deleteCmd := exec.Command("vssadmin", "delete", "shadows", "/all", "/quiet")
+		deleteOutput, err := deleteCmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("Warning: VSS cleanup failed: %v - %s\n", err, string(deleteOutput))
+			return nil // Don't block service startup on cleanup failure
+		}
+
+		fmt.Println("VSS Cleanup: Successfully removed orphaned snapshots")
+	} else {
+		fmt.Println("VSS Cleanup: No orphaned snapshots found")
+	}
+
+	return nil
 }

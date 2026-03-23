@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <?define ProductName = "Nimbus Backup" ?>
-  <?define ProductVersion = "0.1.92" ?>
+  <?define ProductVersion = "0.1.93" ?>
   <?define Manufacturer = "RDEM Systems" ?>
   <?define UpgradeCode = "12345678-1234-1234-1234-123456789012" ?>
 
@@ -102,6 +102,81 @@
 
     <!-- License -->
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+    <!-- ==================== UNINSTALL CONFIGURATION CLEANUP ==================== -->
+
+    <!-- Property to control config deletion (default = keep config) -->
+    <Property Id="KEEP_CONFIG" Value="1" />
+
+    <!-- Set property based on user choice in uninstall dialog -->
+    <CustomAction Id="SetKeepConfigNo" Property="KEEP_CONFIG" Value="0" />
+    <CustomAction Id="SetKeepConfigYes" Property="KEEP_CONFIG" Value="1" />
+
+    <!-- Custom action to delete config directory -->
+    <CustomAction Id="DeleteConfigFolder"
+                  Directory="TARGETDIR"
+                  ExeCommand='cmd.exe /c "if exist "%ProgramData%\NimbusBackup" rmdir /s /q "%ProgramData%\NimbusBackup""'
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <!-- Schedule custom actions -->
+    <InstallExecuteSequence>
+      <!-- Only delete config if KEEP_CONFIG=0 AND we're uninstalling (not upgrading) -->
+      <Custom Action="DeleteConfigFolder" Before="RemoveFiles">
+        (REMOVE="ALL") AND NOT UPGRADINGPRODUCTCODE AND (KEEP_CONFIG="0")
+      </Custom>
+    </InstallExecuteSequence>
+
+    <!-- Custom uninstall dialog (WiX UI extension) -->
+    <UI>
+      <!-- Custom dialog for uninstall -->
+      <Dialog Id="NimbusUninstallDlg" Width="370" Height="270" Title="[ProductName] - Désinstallation">
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes">
+          <Text>{\WixUI_Font_Title}Désinstallation de [ProductName]</Text>
+        </Control>
+
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="30" Transparent="yes" NoPrefix="yes">
+          <Text>Souhaitez-vous conserver votre configuration et vos logs ?</Text>
+        </Control>
+
+        <Control Id="ConfigInfo" Type="Text" X="25" Y="60" Width="320" Height="60" Transparent="yes" NoPrefix="yes">
+          <Text>La configuration est stockée dans :\nC:\ProgramData\NimbusBackup\
+
+Cela inclut :
+• config.json (serveurs PBS, identifiants)
+• jobs.json (tâches planifiées)
+• debug-gui.log et debug-service.log
+          </Text>
+        </Control>
+
+        <Control Id="KeepConfigRadio" Type="RadioButtonGroup" X="25" Y="130" Width="320" Height="50" Property="KEEP_CONFIG">
+          <RadioButtonGroup Property="KEEP_CONFIG">
+            <RadioButton Text="Conserver la configuration" Value="1" X="0" Y="0" Width="300" Height="15" />
+            <RadioButton Text="Supprimer la configuration" Value="0" X="0" Y="20" Width="300" Height="15" />
+          </RadioButtonGroup>
+        </Control>
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Retour">
+          <Publish Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+        </Control>
+
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Désinstaller">
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Annuler">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <!-- Insert custom dialog into uninstall sequence -->
+      <InstallUISequence>
+        <Show Dialog="NimbusUninstallDlg" Before="ProgressDlg">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Show>
+      </InstallUISequence>
+    </UI>
 
   </Product>
 </Wix>

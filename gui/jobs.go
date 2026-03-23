@@ -17,27 +17,34 @@ type Job struct {
 	Created     time.Time `json:"created"`
 	LastRun     time.Time `json:"last_run,omitempty"`
 
-	// PBS Config
-	PBSConfig Config `json:"pbs_config"`
+	// ==================== MULTI-PBS SUPPORT ====================
+	// New: PBS Server ID reference (e.g., "pbs1", "default")
+	// If empty, uses default PBS server from Config
+	PBSID string `json:"pbs_id,omitempty"`
 
-	// Backup sources
+	// Legacy: Full PBS config embedded in job (deprecated)
+	// Kept for backward compatibility with existing jobs.json
+	// If PBSID is empty and PBSConfig is set, uses embedded config
+	PBSConfig Config `json:"pbs_config,omitempty"`
+
+	// ==================== BACKUP SOURCES ====================
 	Folders []string `json:"folders"`
 	Disks   []string `json:"disks,omitempty"`
 
 	// Exclusions
 	Exclusions []string `json:"exclusions"`
 
-	// Schedule
+	// ==================== SCHEDULE ====================
 	Schedule     string `json:"schedule"`       // cron format or preset
 	ScheduleCron string `json:"schedule_cron"`  // actual cron expression
 
-	// Retention
+	// ==================== RETENTION ====================
 	KeepLast    int `json:"keep_last"`
 	KeepDaily   int `json:"keep_daily"`
 	KeepWeekly  int `json:"keep_weekly"`
 	KeepMonthly int `json:"keep_monthly"`
 
-	// Advanced
+	// ==================== ADVANCED ====================
 	Compression     string `json:"compression"`
 	ChunkSize       string `json:"chunk_size"`
 	BandwidthLimit  int    `json:"bandwidth_limit"`
@@ -228,4 +235,43 @@ func joinStrings(items []string, sep string) string {
 		result += item
 	}
 	return result
+}
+
+// ==================== MULTI-PBS HELPER METHODS ====================
+
+// GetPBSConfig resolves and returns the PBS configuration for this job
+// Priority: 1) PBSID reference, 2) Embedded PBSConfig (legacy), 3) Default PBS from global config
+func (j *Job) GetPBSConfig(globalConfig *Config) (*Config, error) {
+	// Case 1: Job references a PBS server by ID
+	if j.PBSID != "" {
+		pbs, err := globalConfig.GetPBSServer(j.PBSID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve PBS server '%s': %w", j.PBSID, err)
+		}
+		return pbs.ToConfig(), nil
+	}
+
+	// Case 2: Legacy - job has embedded PBS config
+	if j.PBSConfig.BaseURL != "" {
+		return &j.PBSConfig, nil
+	}
+
+	// Case 3: Use default PBS server from global config
+	if globalConfig.DefaultPBSID != "" {
+		pbs, err := globalConfig.GetPBSServer(globalConfig.DefaultPBSID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve default PBS server: %w", err)
+		}
+		return pbs.ToConfig(), nil
+	}
+
+	return nil, fmt.Errorf("no PBS configuration found for job '%s'", j.Name)
+}
+
+// MigrateToPBSID migrates a job from embedded PBSConfig to PBSID reference
+// This is called automatically by the GUI when a job is edited
+func (j *Job) MigrateToPBSID(pbsID string) {
+	j.PBSID = pbsID
+	// Clear embedded config to save space (optional, can keep for rollback)
+	j.PBSConfig = Config{}
 }

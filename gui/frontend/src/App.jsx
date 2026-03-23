@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 // Wails runtime imports (will be available when built with Wails)
 let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, ListPhysicalDisks, GetVersion, EventsOn
 let SaveScheduledJob, UpdateScheduledJob, GetScheduledJobs, DeleteScheduledJob, GetJobHistory, GetSystemInfo, GetLastBackupDirs
+// Multi-PBS functions
+let ListPBSServers, GetPBSServer, AddPBSServer, UpdatePBSServer, DeletePBSServer, SetDefaultPBSServer, GetDefaultPBSID, TestPBSConnection
 
 // Check if we're running in Wails
 if (window.go) {
@@ -21,6 +23,15 @@ if (window.go) {
   GetJobHistory = window.go.main.App.GetJobHistory
   GetSystemInfo = window.go.main.App.GetSystemInfo
   GetLastBackupDirs = window.go.main.App.GetLastBackupDirs
+  // Multi-PBS
+  ListPBSServers = window.go.main.App.ListPBSServers
+  GetPBSServer = window.go.main.App.GetPBSServer
+  AddPBSServer = window.go.main.App.AddPBSServer
+  UpdatePBSServer = window.go.main.App.UpdatePBSServer
+  DeletePBSServer = window.go.main.App.DeletePBSServer
+  SetDefaultPBSServer = window.go.main.App.SetDefaultPBSServer
+  GetDefaultPBSID = window.go.main.App.GetDefaultPBSID
+  TestPBSConnection = window.go.main.App.TestPBSConnection
 }
 
 // Wails events
@@ -44,6 +55,24 @@ function App() {
     'backup-id': '',
     usevss: true
   })
+
+  // Multi-PBS states
+  const [pbsServers, setPbsServers] = useState([])
+  const [defaultPBSID, setDefaultPBSID] = useState('')
+  const [selectedPBSID, setSelectedPBSID] = useState('')
+  const [editingServer, setEditingServer] = useState(null)
+  const [serverFormData, setServerFormData] = useState({
+    id: '',
+    name: '',
+    baseurl: '',
+    certfingerprint: '',
+    authid: '',
+    secret: '',
+    datastore: '',
+    namespace: '',
+    description: ''
+  })
+  const [serverStatus, setServerStatus] = useState({}) // Map of server ID -> connection status
 
   const [backupType, setBackupType] = useState('directory')
   const [backupDirs, setBackupDirs] = useState('')
@@ -253,12 +282,188 @@ function App() {
     return () => clearInterval(intervalId)
   }, [])
 
+  // Load PBS servers on mount
+  useEffect(() => {
+    const loadPBSServers = async () => {
+      try {
+        if (ListPBSServers) {
+          const servers = await ListPBSServers()
+          setPbsServers(servers || [])
+        }
+
+        if (GetDefaultPBSID) {
+          const defaultID = await GetDefaultPBSID()
+          setDefaultPBSID(defaultID || '')
+          setSelectedPBSID(defaultID || '')
+        }
+      } catch (err) {
+        console.error('Failed to load PBS servers:', err)
+      }
+    }
+
+    loadPBSServers()
+  }, [])
+
   const showStatus = (message, type) => {
     setStatus({ message, type, visible: true })
     setTimeout(() => {
       setStatus(s => ({ ...s, visible: false }))
     }, 5000)
   }
+
+  // ==================== MULTI-PBS HANDLERS ====================
+
+  const loadPBSServers = async () => {
+    try {
+      if (ListPBSServers) {
+        const servers = await ListPBSServers()
+        setPbsServers(servers || [])
+      }
+      if (GetDefaultPBSID) {
+        const defaultID = await GetDefaultPBSID()
+        setDefaultPBSID(defaultID || '')
+      }
+    } catch (err) {
+      console.error('Failed to load PBS servers:', err)
+      showStatus(`❌ Erreur chargement serveurs: ${err}`, 'error')
+    }
+  }
+
+  const handleAddPBSServer = async () => {
+    if (!AddPBSServer) {
+      showStatus('❌ Wails runtime non disponible', 'error')
+      return
+    }
+
+    try {
+      // Generate ID from name if not provided
+      if (!serverFormData.id) {
+        serverFormData.id = serverFormData.name.toLowerCase().replace(/[^a-z0-9]/g, '-')
+      }
+
+      await AddPBSServer(serverFormData)
+      showStatus('✅ Serveur PBS ajouté', 'success')
+
+      // Reset form and reload
+      setServerFormData({
+        id: '',
+        name: '',
+        baseurl: '',
+        certfingerprint: '',
+        authid: '',
+        secret: '',
+        datastore: '',
+        namespace: '',
+        description: ''
+      })
+      setEditingServer(null)
+      await loadPBSServers()
+    } catch (err) {
+      showStatus(`❌ Erreur: ${err}`, 'error')
+    }
+  }
+
+  const handleUpdatePBSServer = async () => {
+    if (!UpdatePBSServer) {
+      showStatus('❌ Wails runtime non disponible', 'error')
+      return
+    }
+
+    try {
+      await UpdatePBSServer(serverFormData)
+      showStatus('✅ Serveur PBS mis à jour', 'success')
+
+      // Reset form and reload
+      setServerFormData({
+        id: '',
+        name: '',
+        baseurl: '',
+        certfingerprint: '',
+        authid: '',
+        secret: '',
+        datastore: '',
+        namespace: '',
+        description: ''
+      })
+      setEditingServer(null)
+      await loadPBSServers()
+    } catch (err) {
+      showStatus(`❌ Erreur: ${err}`, 'error')
+    }
+  }
+
+  const handleDeletePBSServer = async (id) => {
+    if (!DeletePBSServer) {
+      showStatus('❌ Wails runtime non disponible', 'error')
+      return
+    }
+
+    if (!confirm(`Voulez-vous vraiment supprimer le serveur PBS "${id}" ?`)) {
+      return
+    }
+
+    try {
+      await DeletePBSServer(id)
+      showStatus('✅ Serveur PBS supprimé', 'success')
+      await loadPBSServers()
+    } catch (err) {
+      showStatus(`❌ Erreur: ${err}`, 'error')
+    }
+  }
+
+  const handleSetDefaultPBS = async (id) => {
+    if (!SetDefaultPBSServer) {
+      showStatus('❌ Wails runtime non disponible', 'error')
+      return
+    }
+
+    try {
+      await SetDefaultPBSServer(id)
+      setDefaultPBSID(id)
+      showStatus(`✅ Serveur "${id}" défini par défaut`, 'success')
+    } catch (err) {
+      showStatus(`❌ Erreur: ${err}`, 'error')
+    }
+  }
+
+  const handleTestPBSConnection = async (id) => {
+    if (!TestPBSConnection) {
+      showStatus('❌ Wails runtime non disponible', 'error')
+      return
+    }
+
+    try {
+      setServerStatus(prev => ({ ...prev, [id]: 'testing' }))
+      await TestPBSConnection(id)
+      setServerStatus(prev => ({ ...prev, [id]: 'online' }))
+      showStatus(`✅ Connexion au serveur "${id}" réussie`, 'success')
+    } catch (err) {
+      setServerStatus(prev => ({ ...prev, [id]: 'offline' }))
+      showStatus(`❌ Connexion échouée: ${err}`, 'error')
+    }
+  }
+
+  const handleEditServer = (server) => {
+    setServerFormData(server)
+    setEditingServer(server.id)
+  }
+
+  const handleCancelEdit = () => {
+    setServerFormData({
+      id: '',
+      name: '',
+      baseurl: '',
+      certfingerprint: '',
+      authid: '',
+      secret: '',
+      datastore: '',
+      namespace: '',
+      description: ''
+    })
+    setEditingServer(null)
+  }
+
+  // ==================== END MULTI-PBS HANDLERS ====================
 
   const handleSaveConfig = async () => {
     if (!SaveConfig) {
@@ -467,6 +672,9 @@ function App() {
           <div className={`tab ${activeTab === 'config' ? 'active' : ''}`} onClick={() => setActiveTab('config')}>
             Configuration PBS
           </div>
+          <div className={`tab ${activeTab === 'servers' ? 'active' : ''}`} onClick={() => setActiveTab('servers')}>
+            Serveurs PBS
+          </div>
           <div className={`tab ${activeTab === 'backup' ? 'active' : ''}`} onClick={() => setActiveTab('backup')}>
             Sauvegarde
           </div>
@@ -599,6 +807,190 @@ function App() {
           </div>
 
           {status.visible && activeTab === 'config' && (
+            <div className={`status ${status.type} visible`}>{status.message}</div>
+          )}
+        </div>
+
+        {/* PBS Servers Tab */}
+        <div className={`tab-content ${activeTab === 'servers' ? 'active' : ''}`}>
+          <h2>🖥️ Gestion des serveurs PBS</h2>
+
+          <div className="info-box" style={{marginBottom: '20px'}}>
+            💡 <strong>Multi-PBS :</strong> Configurez plusieurs serveurs PBS pour vos backups.<br/>
+            Exemple : C:\ → PBS big-data (lent, gros espace) | C:\Users → PBS SSD (rapide, petit)
+          </div>
+
+          {/* Server List */}
+          <div className="card" style={{marginBottom: '20px'}}>
+            <h3>Serveurs configurés ({pbsServers.length})</h3>
+
+            {pbsServers.length === 0 ? (
+              <p style={{color: '#999', fontStyle: 'italic'}}>Aucun serveur PBS configuré. Ajoutez-en un ci-dessous.</p>
+            ) : (
+              <table style={{width: '100%', marginTop: '15px'}}>
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>URL</th>
+                    <th>Datastore</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pbsServers.map(server => (
+                    <tr key={server.id}>
+                      <td>
+                        <strong>{server.name}</strong>
+                        {server.id === defaultPBSID && <span style={{marginLeft: '5px', color: '#fbbf24'}}>⭐ Défaut</span>}
+                        {server.description && <div style={{fontSize: '0.85em', color: '#999'}}>{server.description}</div>}
+                      </td>
+                      <td>{server.baseurl}</td>
+                      <td>{server.datastore}/{server.namespace || '-'}</td>
+                      <td>
+                        {serverStatus[server.id] === 'testing' && <span style={{color: '#3b82f6'}}>🔄 Test...</span>}
+                        {serverStatus[server.id] === 'online' && <span style={{color: '#10b981'}}>🟢 Online</span>}
+                        {serverStatus[server.id] === 'offline' && <span style={{color: '#ef4444'}}>🔴 Offline</span>}
+                        {!serverStatus[server.id] && <span style={{color: '#999'}}>⚪ Non testé</span>}
+                      </td>
+                      <td>
+                        <button onClick={() => handleTestPBSConnection(server.id)} style={{marginRight: '5px', padding: '5px 10px', fontSize: '0.9em'}}>
+                          🔍 Tester
+                        </button>
+                        <button onClick={() => handleEditServer(server)} style={{marginRight: '5px', padding: '5px 10px', fontSize: '0.9em'}}>
+                          ✏️ Modifier
+                        </button>
+                        {server.id !== defaultPBSID && (
+                          <button onClick={() => handleSetDefaultPBS(server.id)} style={{marginRight: '5px', padding: '5px 10px', fontSize: '0.9em', backgroundColor: '#fbbf24'}}>
+                            ⭐ Par défaut
+                          </button>
+                        )}
+                        <button onClick={() => handleDeletePBSServer(server.id)} style={{padding: '5px 10px', fontSize: '0.9em', backgroundColor: '#ef4444', color: 'white'}}>
+                          🗑️ Supprimer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Add/Edit Server Form */}
+          <div className="card">
+            <h3>{editingServer ? '✏️ Modifier le serveur' : '➕ Ajouter un serveur PBS'}</h3>
+
+            <div className="form-group">
+              <label>Nom du serveur</label>
+              <input
+                type="text"
+                value={serverFormData.name}
+                onChange={(e) => setServerFormData({...serverFormData, name: e.target.value})}
+                placeholder="SSD Rapide"
+              />
+            </div>
+
+            {!editingServer && (
+              <div className="form-group">
+                <label>ID du serveur (auto-généré si vide)</label>
+                <input
+                  type="text"
+                  value={serverFormData.id}
+                  onChange={(e) => setServerFormData({...serverFormData, id: e.target.value})}
+                  placeholder="pbs-ssd (laissez vide pour auto-génération)"
+                />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>URL du serveur PBS</label>
+              <input
+                type="text"
+                value={serverFormData.baseurl}
+                onChange={(e) => setServerFormData({...serverFormData, baseurl: e.target.value})}
+                placeholder="https://pbs-ssd.example.com:8007"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Authentication ID</label>
+              <input
+                type="text"
+                value={serverFormData.authid}
+                onChange={(e) => setServerFormData({...serverFormData, authid: e.target.value})}
+                placeholder="backup@pbs!token-name"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Secret (API Token)</label>
+              <input
+                type="password"
+                value={serverFormData.secret}
+                onChange={(e) => setServerFormData({...serverFormData, secret: e.target.value})}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Datastore</label>
+              <input
+                type="text"
+                value={serverFormData.datastore}
+                onChange={(e) => setServerFormData({...serverFormData, datastore: e.target.value})}
+                placeholder="ssd-fast"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Namespace (optionnel)</label>
+              <input
+                type="text"
+                value={serverFormData.namespace}
+                onChange={(e) => setServerFormData({...serverFormData, namespace: e.target.value})}
+                placeholder="clients"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Empreinte certificat SSL (optionnel)</label>
+              <input
+                type="text"
+                value={serverFormData.certfingerprint}
+                onChange={(e) => setServerFormData({...serverFormData, certfingerprint: e.target.value})}
+                placeholder="AA:BB:CC:DD:..."
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Description (optionnelle)</label>
+              <textarea
+                value={serverFormData.description}
+                onChange={(e) => setServerFormData({...serverFormData, description: e.target.value})}
+                placeholder="Stockage SSD pour backups critiques"
+                rows="2"
+              />
+            </div>
+
+            <div style={{display: 'flex', gap: '10px', marginTop: '20px'}}>
+              {editingServer ? (
+                <>
+                  <button onClick={handleUpdatePBSServer} style={{flex: 1}}>
+                    💾 Mettre à jour
+                  </button>
+                  <button onClick={handleCancelEdit} style={{flex: 1, backgroundColor: '#999'}}>
+                    ❌ Annuler
+                  </button>
+                </>
+              ) : (
+                <button onClick={handleAddPBSServer} style={{flex: 1}}>
+                  ➕ Ajouter le serveur
+                </button>
+              )}
+            </div>
+          </div>
+
+          {status.visible && activeTab === 'servers' && (
             <div className={`status ${status.type} visible`}>{status.message}</div>
           )}
         </div>

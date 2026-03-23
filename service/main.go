@@ -41,6 +41,12 @@ func (p *program) Start(s service.Service) error {
 func (p *program) run() {
 	logger.Infof("Service %s started", serviceName)
 
+	// Clean up orphaned VSS snapshots from previous crashes
+	logger.Info("Running VSS cleanup...")
+	if err := cleanupVSS(); err != nil {
+		logger.Warningf("VSS cleanup failed (non-fatal): %v", err)
+	}
+
 	// Main service loop
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
