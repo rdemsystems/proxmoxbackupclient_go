@@ -49,7 +49,7 @@
       <!-- Service Executable -->
       <Component Id="ServiceExecutable" Guid="*" Win64="yes">
         <File Id="NimbusBackupSVCEXE"
-              Source="../../cmd/service/NimbusBackupSVC.exe"
+              Source="../../gui/build/bin/NimbusBackupSVC.exe"
               KeyPath="yes" />
 
         <!-- Service installation -->
