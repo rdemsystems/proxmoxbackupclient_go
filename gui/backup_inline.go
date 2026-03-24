@@ -10,6 +10,7 @@ import (
 	"hash"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -37,6 +38,24 @@ type BackupOptions struct {
 }
 
 var didxMagic = []byte{28, 145, 78, 165, 25, 186, 179, 205}
+
+// Global backup locks per destination (BaseURL + Datastore)
+var (
+	backupLocks      = make(map[string]*sync.Mutex)
+	backupLocksMutex sync.Mutex
+)
+
+// getBackupLock returns a mutex for the given backup destination
+func getBackupLock(baseURL, datastore string) *sync.Mutex {
+	key := baseURL + "|" + datastore
+	backupLocksMutex.Lock()
+	defer backupLocksMutex.Unlock()
+
+	if _, exists := backupLocks[key]; !exists {
+		backupLocks[key] = &sync.Mutex{}
+	}
+	return backupLocks[key]
+}
 
 // calculateDirSize scans a directory recursively and returns total size in bytes
 func calculateDirSize(path string) uint64 {
@@ -298,6 +317,22 @@ func RunBackupInline(opts BackupOptions) error {
 	if len(opts.BackupDirs) == 0 {
 		return fmt.Errorf("at least one backup directory or drive required")
 	}
+
+	// Acquire backup lock for this destination to prevent concurrent backups
+	backupLock := getBackupLock(opts.BaseURL, opts.Datastore)
+	writeDebugLog(fmt.Sprintf("[Backup Lock] Waiting for lock on %s/%s (prevents concurrent backups)", opts.BaseURL, opts.Datastore))
+
+	// Notify that we're waiting if OnProgress is set
+	if opts.OnProgress != nil {
+		opts.OnProgress(0, "Waiting for previous backup to complete...")
+	}
+
+	backupLock.Lock()
+	writeDebugLog(fmt.Sprintf("[Backup Lock] ✓ Lock acquired for %s/%s - starting backup", opts.BaseURL, opts.Datastore))
+	defer func() {
+		backupLock.Unlock()
+		writeDebugLog(fmt.Sprintf("[Backup Lock] ✓ Lock released for %s/%s", opts.BaseURL, opts.Datastore))
+	}()
 
 	// Use hostname as backup ID if not specified
 	writeDebugLog("[DEBUG] Getting hostname if needed")
