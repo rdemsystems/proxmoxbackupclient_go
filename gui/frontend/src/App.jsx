@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from './i18n/i18nContext'
+import LanguageSwitcher from './components/LanguageSwitcher'
 
 // Wails runtime imports (will be available when built with Wails)
 let GetConfigWithHostname, SaveConfig, TestConnection, StartBackup, ListSnapshots, RestoreSnapshot, ListPhysicalDisks, GetVersion, EventsOn
@@ -40,6 +42,7 @@ if (window.runtime) {
 }
 
 function App() {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState('servers')
   const [hostname, setHostname] = useState('')
   const [appVersion, setAppVersion] = useState('dev')
@@ -325,7 +328,7 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to load PBS servers:', err)
-      showStatus(`❌ Erreur chargement serveurs: ${err}`, 'error')
+      showStatus(`❌ ${t('statusServerLoadError')} ${err}`, 'error')
     }
   }
 
@@ -342,7 +345,7 @@ function App() {
       }
 
       await AddPBSServer(serverFormData)
-      showStatus('✅ Serveur PBS ajouté', 'success')
+      showStatus(`✅ ${t('statusServerAdded')}`, 'success')
 
       // Reset form and reload
       setServerFormData({
@@ -371,7 +374,7 @@ function App() {
 
     try {
       await UpdatePBSServer(serverFormData)
-      showStatus('✅ Serveur PBS mis à jour', 'success')
+      showStatus(`✅ ${t('statusServerUpdated')}`, 'success')
 
       // Reset form and reload
       setServerFormData({
@@ -398,13 +401,13 @@ function App() {
       return
     }
 
-    if (!confirm(`Voulez-vous vraiment supprimer le serveur PBS "${id}" ?`)) {
+    if (!confirm(t('confirmDeleteServer').replace('{id}', id))) {
       return
     }
 
     try {
       await DeletePBSServer(id)
-      showStatus('✅ Serveur PBS supprimé', 'success')
+      showStatus(`✅ ${t('statusServerDeleted')}`, 'success')
       await loadPBSServers()
     } catch (err) {
       showStatus(`❌ Erreur: ${err}`, 'error')
@@ -420,7 +423,7 @@ function App() {
     try {
       await SetDefaultPBSServer(id)
       setDefaultPBSID(id)
-      showStatus(`✅ Serveur "${id}" défini par défaut`, 'success')
+      showStatus(`✅ ${t('statusServerSetDefault').replace('{id}', id)}`, 'success')
     } catch (err) {
       showStatus(`❌ Erreur: ${err}`, 'error')
     }
@@ -436,10 +439,10 @@ function App() {
       setServerStatus(prev => ({ ...prev, [id]: 'testing' }))
       await TestPBSConnection(id)
       setServerStatus(prev => ({ ...prev, [id]: 'online' }))
-      showStatus(`✅ Connexion au serveur "${id}" réussie`, 'success')
+      showStatus(`✅ ${t('statusConnectionSuccess').replace('{id}', id)}`, 'success')
     } catch (err) {
       setServerStatus(prev => ({ ...prev, [id]: 'offline' }))
-      showStatus(`❌ Connexion échouée: ${err}`, 'error')
+      showStatus(`❌ ${t('statusConnectionFailed')} ${err}`, 'error')
     }
   }
 
@@ -486,7 +489,7 @@ function App() {
       }
       await SaveConfig(trimmedConfig)
       setConfig(trimmedConfig)
-      showStatus('✅ Configuration enregistrée', 'success')
+      showStatus(`✅ ${t('statusConfigSaved')}`, 'success')
     } catch (err) {
       showStatus(`❌ Erreur : ${err}`, 'error')
     }
@@ -512,7 +515,7 @@ function App() {
         usevss: config.usevss !== undefined ? config.usevss : true
       }
       await TestConnection(testConfig)
-      showStatus('✅ Connexion réussie !', 'success')
+      showStatus(`✅ ${t('statusConnectionOK')}`, 'success')
     } catch (err) {
       showStatus(`❌ ${err}`, 'error')
     }
@@ -527,9 +530,9 @@ function App() {
       try {
         const loadedConfig = JSON.parse(evt.target.result)
         setConfig(loadedConfig)
-        showStatus('✅ Configuration chargée depuis le fichier', 'success')
+        showStatus(`✅ ${t('statusConfigLoaded')}`, 'success')
       } catch (err) {
-        showStatus('❌ Erreur : fichier JSON invalide', 'error')
+        showStatus(`❌ ${t('statusInvalidJSON')}`, 'error')
       }
     }
     reader.readAsText(file)
@@ -696,7 +699,7 @@ function App() {
     }
 
     // One-shot mode - execute immediately
-    showStatus('🚀 Démarrage de la sauvegarde...', 'info')
+    showStatus(`🚀 ${t('statusBackupStarting')}`, 'info')
     setProgress(5)
 
     try {
@@ -709,7 +712,7 @@ function App() {
         config.usevss
       )
       // Backup started in background - progress will be shown via events
-      showStatus('⏳ Sauvegarde en cours...', 'info')
+      showStatus(`⏳ ${t('statusBackupRunning')}`, 'info')
     } catch (err) {
       setProgress(0)
       showStatus(`❌ ${err}`, 'error')
@@ -745,14 +748,14 @@ function App() {
       return
     }
 
-    const destPath = prompt('Chemin de destination pour la restauration:', 'C:\\Restore')
+    const destPath = prompt(t('restoreDestPrompt'), 'C:\\Restore')
     if (!destPath) return
 
-    showStatus(`🔄 Restauration du snapshot ${time}...`, 'info')
+    showStatus(`🔄 ${t('statusRestoring').replace('{time}', time)}`, 'info')
 
     try {
       await RestoreSnapshot(snapshotId, destPath)
-      showStatus('✅ Restauration terminée !', 'success')
+      showStatus(`✅ ${t('statusRestoreComplete')}`, 'success')
     } catch (err) {
       showStatus(`❌ ${err}`, 'error')
     }
@@ -761,46 +764,51 @@ function App() {
   return (
     <>
       <div className="header">
-        <h1>🛡️ Nimbus Backup</h1>
-        <p>Client de sauvegarde pour Proxmox Backup Server - RDEM Systems</p>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <div>
+            <h1>🛡️ {t('appTitle')}</h1>
+            <p>{t('appSubtitle')}</p>
+          </div>
+          <LanguageSwitcher />
+        </div>
       </div>
 
       <div className="container">
         <div className="tabs">
           <div className={`tab ${activeTab === 'servers' ? 'active' : ''}`} onClick={() => setActiveTab('servers')}>
-            Configuration PBS
+            {t('tabServers')}
           </div>
           <div className={`tab ${activeTab === 'backup' ? 'active' : ''}`} onClick={() => setActiveTab('backup')}>
-            Sauvegarde
+            {t('tabBackup')}
           </div>
           <div className={`tab ${activeTab === 'restore' ? 'active' : ''}`} onClick={() => setActiveTab('restore')}>
-            Restauration
+            {t('tabRestore')}
           </div>
           <div className={`tab ${activeTab === 'about' ? 'active' : ''}`} onClick={() => setActiveTab('about')}>
-            À propos
+            {t('tabAbout')}
           </div>
         </div>
 
         {/* PBS Configuration Tab */}
         <div className={`tab-content ${activeTab === 'servers' ? 'active' : ''}`}>
-          <h2>🖥️ Configuration PBS</h2>
+          <h2>🖥️ {t('serversTitle')}</h2>
 
           {/* Show form first if no servers configured */}
           {pbsServers.length === 0 ? (
             <>
               <div className="info-box" style={{marginBottom: '20px', backgroundColor: '#eef2ff', borderLeft: '4px solid #667eea'}}>
-                👋 <strong>Bienvenue !</strong> Configurez votre premier serveur PBS pour commencer les backups.<br/>
+                👋 <strong>{t('welcomeMessage')}</strong> {t('welcomeText')}<br/>
                 {!config.baseurl && (
                   <>
                     <br/>
-                    <strong>📦 Vous n'avez pas encore de serveur PBS ?</strong><br/>
+                    <strong>📦 {t('noPBSYet')}</strong><br/>
                     <a
                       href={`https://nimbus.rdem-systems.com/choisir-mon-backup/?utm_source=NimbusGui&utm_medium=tooling&utm_campaign=version-${appVersion}&utm_content=first-setup`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{color: '#667eea', fontWeight: 'bold', textDecoration: 'underline'}}
                     >
-                      Commander du stockage Nimbus Backup →
+                      {t('orderStorage')} →
                     </a>
                   </>
                 )}
@@ -808,15 +816,15 @@ function App() {
 
               {/* Add Server Form - Prominent when no servers */}
               <div className="card">
-                <h3>➕ Ajouter votre serveur PBS</h3>
+                <h3>➕ {t('addYourServer')}</h3>
               <table style={{width: '100%', marginTop: '15px'}}>
                 <thead>
                   <tr>
-                    <th>Nom</th>
-                    <th>URL</th>
-                    <th>Datastore</th>
-                    <th>Statut</th>
-                    <th>Actions</th>
+                    <th>{t('name')}</th>
+                    <th>{t('url')}</th>
+                    <th>{t('datastore')}</th>
+                    <th>{t('status')}</th>
+                    <th>{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -824,31 +832,31 @@ function App() {
                     <tr key={server.id}>
                       <td>
                         <strong>{server.name}</strong>
-                        {server.id === defaultPBSID && <span style={{marginLeft: '5px', color: '#fbbf24'}}>⭐ Défaut</span>}
+                        {server.id === defaultPBSID && <span style={{marginLeft: '5px', color: '#fbbf24'}}>⭐ {t('default')}</span>}
                         {server.description && <div style={{fontSize: '0.85em', color: '#999'}}>{server.description}</div>}
                       </td>
                       <td>{server.baseurl}</td>
                       <td>{server.datastore}/{server.namespace || '-'}</td>
                       <td>
-                        {serverStatus[server.id] === 'testing' && <span style={{color: '#3b82f6'}}>🔄 Test...</span>}
-                        {serverStatus[server.id] === 'online' && <span style={{color: '#10b981'}}>🟢 Online</span>}
-                        {serverStatus[server.id] === 'offline' && <span style={{color: '#ef4444'}}>🔴 Offline</span>}
-                        {!serverStatus[server.id] && <span style={{color: '#999'}}>⚪ Non testé</span>}
+                        {serverStatus[server.id] === 'testing' && <span style={{color: '#3b82f6'}}>🔄 {t('testing')}</span>}
+                        {serverStatus[server.id] === 'online' && <span style={{color: '#10b981'}}>🟢 {t('online')}</span>}
+                        {serverStatus[server.id] === 'offline' && <span style={{color: '#ef4444'}}>🔴 {t('offline')}</span>}
+                        {!serverStatus[server.id] && <span style={{color: '#999'}}>⚪ {t('untested')}</span>}
                       </td>
                       <td>
                         <button onClick={() => handleTestPBSConnection(server.id)} style={{marginRight: '5px', padding: '5px 10px', fontSize: '0.9em'}}>
-                          🔍 Tester
+                          🔍 {t('test')}
                         </button>
                         <button onClick={() => handleEditServer(server)} style={{marginRight: '5px', padding: '5px 10px', fontSize: '0.9em'}}>
-                          ✏️ Modifier
+                          ✏️ {t('edit')}
                         </button>
                         {server.id !== defaultPBSID && (
                           <button onClick={() => handleSetDefaultPBS(server.id)} style={{marginRight: '5px', padding: '5px 10px', fontSize: '0.9em', backgroundColor: '#fbbf24'}}>
-                            ⭐ Par défaut
+                            ⭐ {t('setAsDefault')}
                           </button>
                         )}
                         <button onClick={() => handleDeletePBSServer(server.id)} style={{padding: '5px 10px', fontSize: '0.9em', backgroundColor: '#ef4444', color: 'white'}}>
-                          🗑️ Supprimer
+                          🗑️ {t('delete')}
                         </button>
                       </td>
                     </tr>
@@ -860,10 +868,10 @@ function App() {
 
           {/* Add/Edit Server Form */}
           <div className="card">
-            <h3>{editingServer ? '✏️ Modifier le serveur' : '➕ Ajouter un serveur PBS'}</h3>
+            <h3>{editingServer ? `✏️ ${t('editServer')}` : `➕ ${t('addYourServer')}`}</h3>
 
             <div className="form-group">
-              <label>Nom du serveur</label>
+              <label>{t('serverName')}</label>
               <input
                 type="text"
                 value={serverFormData.name}
@@ -874,7 +882,7 @@ function App() {
 
             {!editingServer && (
               <div className="form-group">
-                <label>ID du serveur (auto-généré si vide)</label>
+                <label>{t('serverID')}</label>
                 <input
                   type="text"
                   value={serverFormData.id}
@@ -885,7 +893,7 @@ function App() {
             )}
 
             <div className="form-group">
-              <label>URL du serveur PBS</label>
+              <label>{t('serverURL')}</label>
               <input
                 type="text"
                 value={serverFormData.baseurl}
@@ -895,7 +903,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Authentication ID</label>
+              <label>{t('authID')}</label>
               <input
                 type="text"
                 value={serverFormData.authid}
@@ -905,7 +913,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Secret (API Token)</label>
+              <label>{t('secret')}</label>
               <input
                 type="password"
                 value={serverFormData.secret}
@@ -915,7 +923,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Datastore</label>
+              <label>{t('datastore')}</label>
               <input
                 type="text"
                 value={serverFormData.datastore}
@@ -925,7 +933,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Namespace (optionnel)</label>
+              <label>{t('namespace')}</label>
               <input
                 type="text"
                 value={serverFormData.namespace}
@@ -935,7 +943,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Empreinte certificat SSL (optionnel)</label>
+              <label>{t('certFingerprint')}</label>
               <input
                 type="text"
                 value={serverFormData.certfingerprint}
@@ -945,7 +953,7 @@ function App() {
             </div>
 
             <div className="form-group">
-              <label>Description (optionnelle)</label>
+              <label>{t('description')}</label>
               <textarea
                 value={serverFormData.description}
                 onChange={(e) => setServerFormData({...serverFormData, description: e.target.value})}
@@ -958,22 +966,22 @@ function App() {
               {editingServer ? (
                 <>
                   <button onClick={handleUpdatePBSServer} style={{flex: 1}}>
-                    💾 Mettre à jour
+                    💾 {t('update')}
                   </button>
                   <button onClick={handleCancelEdit} style={{flex: 1, backgroundColor: '#999'}}>
-                    ❌ Annuler
+                    ❌ {t('cancel')}
                   </button>
                 </>
               ) : (
                 <button onClick={handleAddPBSServer} style={{flex: 1}}>
-                  ➕ Ajouter mon premier serveur
+                  ➕ {t('addFirstServer')}
                 </button>
               )}
             </div>
 
             <div className="info-box" style={{marginTop: '20px'}}>
-              💡 <strong>Astuce :</strong> Obtenez votre API Token depuis l'interface PBS:<br/>
-              Configuration → Access Control → API Tokens
+              💡 <strong>{t('tipTitle')}</strong> {t('tipAPIToken')}<br/>
+              {t('tipAPITokenPath')}
             </div>
           </div>
             </>
@@ -981,13 +989,13 @@ function App() {
             <>
               {/* Multi-PBS info for users with existing servers */}
               <div className="info-box" style={{marginBottom: '20px'}}>
-                💡 <strong>Multi-PBS :</strong> Gérez plusieurs serveurs PBS pour vos backups.<br/>
-                Exemple : C:\ → PBS big-data (lent, gros espace) | C:\Users → PBS SSD (rapide, petit)
+                💡 <strong>{t('multiPBSInfo')}</strong> {t('multiPBSText')}<br/>
+                {t('multiPBSExample')}
               </div>
 
               {/* Server List */}
               <div className="card" style={{marginBottom: '20px'}}>
-                <h3>Serveurs configurés ({pbsServers.length})</h3>
+                <h3>{t('configuredServers')} ({pbsServers.length})</h3>
 
                 <table style={{width: '100%', marginTop: '15px'}}>
                   <thead>
@@ -1004,7 +1012,7 @@ function App() {
                       <tr key={server.id}>
                         <td>
                           <strong>{server.name}</strong>
-                          {server.id === defaultPBSID && <span style={{marginLeft: '5px', color: '#fbbf24'}}>⭐ Défaut</span>}
+                          {server.id === defaultPBSID && <span style={{marginLeft: '5px', color: '#fbbf24'}}>⭐ {t('default')}</span>}
                           {server.description && <div style={{fontSize: '0.85em', color: '#999'}}>{server.description}</div>}
                         </td>
                         <td>{server.baseurl}</td>
@@ -1039,10 +1047,10 @@ function App() {
 
               {/* Add/Edit Server Form */}
               <div className="card">
-                <h3>{editingServer ? '✏️ Modifier le serveur' : '➕ Ajouter un autre serveur PBS'}</h3>
+                <h3>{editingServer ? `✏️ ${t('editServer')}` : `➕ ${t('addAnotherServer')}`}</h3>
 
                 <div className="form-group">
-                  <label>Nom du serveur</label>
+                  <label>{t('serverName')}</label>
                   <input
                     type="text"
                     value={serverFormData.name}
@@ -1053,7 +1061,7 @@ function App() {
 
                 {!editingServer && (
                   <div className="form-group">
-                    <label>ID du serveur (auto-généré si vide)</label>
+                    <label>{t('serverID')}</label>
                     <input
                       type="text"
                       value={serverFormData.id}
@@ -1064,7 +1072,7 @@ function App() {
                 )}
 
                 <div className="form-group">
-                  <label>URL du serveur PBS</label>
+                  <label>{t('serverURL')}</label>
                   <input
                     type="text"
                     value={serverFormData.baseurl}
@@ -1074,7 +1082,7 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Authentication ID</label>
+                  <label>{t('authID')}</label>
                   <input
                     type="text"
                     value={serverFormData.authid}
@@ -1084,7 +1092,7 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Secret (API Token)</label>
+                  <label>{t('secret')}</label>
                   <input
                     type="password"
                     value={serverFormData.secret}
@@ -1094,7 +1102,7 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Datastore</label>
+                  <label>{t('datastore')}</label>
                   <input
                     type="text"
                     value={serverFormData.datastore}
@@ -1104,7 +1112,7 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Namespace (optionnel)</label>
+                  <label>{t('namespace')}</label>
                   <input
                     type="text"
                     value={serverFormData.namespace}
@@ -1114,7 +1122,7 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Empreinte certificat SSL (optionnel)</label>
+                  <label>{t('certFingerprint')}</label>
                   <input
                     type="text"
                     value={serverFormData.certfingerprint}
@@ -1124,7 +1132,7 @@ function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Description (optionnelle)</label>
+                  <label>{t('description')}</label>
                   <textarea
                     value={serverFormData.description}
                     onChange={(e) => setServerFormData({...serverFormData, description: e.target.value})}
@@ -1145,7 +1153,7 @@ function App() {
                     </>
                   ) : (
                     <button onClick={handleAddPBSServer} style={{flex: 1}}>
-                      ➕ Ajouter le serveur
+                      ➕ {t('addServer')}
                     </button>
                   )}
                 </div>
@@ -1160,19 +1168,19 @@ function App() {
 
         {/* Backup Tab */}
         <div className={`tab-content ${activeTab === 'backup' ? 'active' : ''}`}>
-          <h2>Sauvegarde</h2>
+          <h2>{t('backupTitle')}</h2>
 
           <div className="form-group">
-            <label>Type de sauvegarde</label>
+            <label>{t('backupType')}</label>
             <select value={backupType} onChange={(e) => setBackupType(e.target.value)}>
-              <option value="directory">📁 Répertoire (dossier spécifique)</option>
-              {/* <option value="machine">💾 Machine (disque complet)</option> */}
+              <option value="directory">📁 {t('backupTypeDirectory')}</option>
+              {/* <option value="machine">💾 {t('backupTypeMachine')}</option> */}
             </select>
           </div>
 
           {/* Backup Mode Toggle */}
           <div className="form-group">
-            <label>Mode d'exécution</label>
+            <label>{t('executionMode')}</label>
             <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
               <button
                 onClick={() => setBackupMode('oneshot')}
@@ -1187,8 +1195,8 @@ function App() {
                   fontWeight: 'bold'
                 }}
               >
-                <span className="compact-text-long">⚡ One-shot (maintenant)</span>
-                <span className="compact-text-short">⚡ Now</span>
+                <span className="compact-text-long">⚡ {t('oneshotMode')}</span>
+                <span className="compact-text-short">⚡ {t('oneshotModeShort')}</span>
               </button>
               <button
                 onClick={() => setBackupMode('scheduled')}
@@ -1203,8 +1211,8 @@ function App() {
                   fontWeight: 'bold'
                 }}
               >
-                <span className="compact-text-long">📅 Planifié</span>
-                <span className="compact-text-short">📅 Schedule</span>
+                <span className="compact-text-long">📅 {t('scheduledMode')}</span>
+                <span className="compact-text-short">📅 {t('scheduledModeShort')}</span>
               </button>
             </div>
           </div>
@@ -1212,16 +1220,16 @@ function App() {
           {/* Scheduling Options */}
           {backupMode === 'scheduled' && (
             <div className="card" style={{marginTop: '20px', padding: '20px'}}>
-              <h3 style={{marginTop: 0}}>⏰ Configuration de la planification</h3>
+              <h3 style={{marginTop: 0}}>⏰ {t('schedulingConfig')}</h3>
 
               {editingJobId && (
                 <div className="info-box" style={{backgroundColor: '#fff3cd', borderColor: '#ffc107', marginBottom: '15px'}}>
-                  ✏️ <strong>Mode édition</strong> - Modifiez les paramètres et cliquez sur "Mettre à jour"
+                  ✏️ <strong>{t('editMode')}</strong> - {t('editModeText')}
                 </div>
               )}
 
               <div className="form-group">
-                <label>Heure d'exécution quotidienne</label>
+                <label>{t('dailyExecutionTime')}</label>
                 <input
                   type="time"
                   value={scheduleTime}
@@ -1238,20 +1246,20 @@ function App() {
                     onChange={(e) => setRunAtStartup(e.target.checked)}
                     style={{width: '20px', height: '20px', cursor: 'pointer'}}
                   />
-                  <span>🚀 Exécuter aussi au démarrage de la machine</span>
+                  <span>🚀 {t('runAtStartup')}</span>
                 </label>
               </div>
 
               <div className="info-box" style={{backgroundColor: '#eef2ff'}}>
-                💡 Le backup sera exécuté automatiquement chaque jour à <strong>{scheduleTime}</strong>
-                {runAtStartup && <><br/>Et également à chaque démarrage du système.</>}
+                💡 {t('schedulingInfo')} <strong>{scheduleTime}</strong>
+                {runAtStartup && <><br/>{t('andAtStartup')}</>}
               </div>
             </div>
           )}
 
           {backupType === 'directory' ? (
             <div className="form-group">
-              <label>Répertoires à sauvegarder (un par ligne)</label>
+              <label>{t('directoriesToBackup')}</label>
               <textarea
                 value={backupDirs}
                 onChange={(e) => {
@@ -1267,10 +1275,10 @@ function App() {
           ) : (
             <>
               <div className="form-group">
-                <label>Disques physiques à sauvegarder</label>
+                <label>{t('physicalDisksToBackup')}</label>
                 {physicalDisks.length === 0 ? (
                   <div style={{padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px'}}>
-                    🔍 Chargement des disques disponibles...
+                    🔍 {t('loadingDisks')}
                   </div>
                 ) : (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
@@ -1295,7 +1303,7 @@ function App() {
               </div>
 
               <div className="form-group">
-                <label>Fichiers à exclure (un par ligne, optionnel)</label>
+                <label>{t('filesToExclude')}</label>
                 <textarea
                   value={excludeList}
                   onChange={(e) => setExcludeList(e.target.value)}
@@ -1307,12 +1315,12 @@ function App() {
           )}
 
           <div className="form-group">
-            <label>Backup ID</label>
+            <label>{t('backupID')}</label>
             <input
               type="text"
               value={config['backup-id']}
               onChange={(e) => setConfig({...config, 'backup-id': e.target.value})}
-              placeholder="Laissez vide pour utiliser le hostname"
+              placeholder={t('backupIDPlaceholder')}
             />
           </div>
 
@@ -1323,18 +1331,18 @@ function App() {
                 checked={config.usevss}
                 onChange={(e) => setConfig({...config, usevss: e.target.checked})}
               />
-              Utiliser VSS (Windows Shadow Copy)
+              {t('useVSS')}
             </label>
             {config.usevss && systemInfo.mode === 'Standalone' && !systemInfo.is_admin && (
               <div className="info-box" style={{marginTop: '10px', backgroundColor: '#fff3cd', borderColor: '#ffc107'}}>
-                ⚠️ <strong>VSS nécessite des privilèges administrateur.</strong><br/>
-                Redémarrez l'application en tant qu'administrateur (clic droit → Exécuter en tant qu'administrateur) pour utiliser VSS.
+                ⚠️ <strong>{t('vssAdminRequired')}</strong><br/>
+                {t('vssAdminHint')}
               </div>
             )}
             {config.usevss && systemInfo.service_available && (
               <div className="info-box" style={{marginTop: '10px', backgroundColor: '#d1ecf1', borderColor: '#bee5eb'}}>
-                ℹ️ <strong>VSS disponible via le service.</strong><br/>
-                Le service Windows tourne avec les privilèges nécessaires pour VSS.
+                ℹ️ <strong>{t('vssServiceAvailable')}</strong><br/>
+                {t('vssServiceHint')}
               </div>
             )}
           </div>
@@ -1342,7 +1350,7 @@ function App() {
           {progress > 0 && progress < 100 && (
             <div style={{marginTop: '20px', marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6'}}>
               <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '10px'}}>
-                <strong style={{fontSize: '15px'}}>📊 Progression du backup</strong>
+                <strong style={{fontSize: '15px'}}>📊 {t('backupProgress')}</strong>
                 <span style={{fontSize: '18px', fontWeight: 'bold', color: '#0066cc'}}>{progress}%</span>
               </div>
 
@@ -1364,17 +1372,17 @@ function App() {
               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px'}}>
                 {backupStats.eta !== null && (
                   <div style={{fontSize: '13px', color: '#495057'}}>
-                    ⏱️ <strong>Temps restant:</strong> {Math.floor(backupStats.eta / 60)}m {backupStats.eta % 60}s
+                    ⏱️ <strong>{t('timeRemaining')}</strong> {Math.floor(backupStats.eta / 60)}m {backupStats.eta % 60}s
                   </div>
                 )}
                 {backupStats.speed > 0 && (
                   <div style={{fontSize: '13px', color: '#495057'}}>
-                    ⚡ <strong>Vitesse:</strong> {backupStats.speed.toFixed(1)}%/s
+                    ⚡ <strong>{t('speed')}</strong> {backupStats.speed.toFixed(1)}%/s
                   </div>
                 )}
                 {backupStats.startTime && (
                   <div style={{fontSize: '13px', color: '#495057'}}>
-                    ⏰ <strong>Temps écoulé:</strong> {Math.floor((Date.now() - backupStats.startTime) / 1000)}s
+                    ⏰ <strong>{t('elapsedTime')}</strong> {Math.floor((Date.now() - backupStats.startTime) / 1000)}s
                   </div>
                 )}
               </div>
@@ -1389,12 +1397,12 @@ function App() {
 
           <button className="btn" onClick={handleStartBackup} disabled={progress > 0 && progress < 100}>
             {backupMode === 'oneshot'
-              ? (progress > 0 && progress < 100 ? '⏳ Sauvegarde en cours...' : '🚀 Démarrer la sauvegarde')
-              : (editingJobId ? '✏️ Mettre à jour la planification' : '💾 Enregistrer la planification')
+              ? (progress > 0 && progress < 100 ? `⏳ ${t('backupInProgress')}` : `🚀 ${t('startBackup')}`)
+              : (editingJobId ? `✏️ ${t('updateSchedule')}` : `💾 ${t('saveSchedule')}`)
             }
           </button>
           {backupMode === 'oneshot' && (
-            <button className="btn btn-secondary" onClick={() => setProgress(0)} disabled={progress === 0}>Arrêter</button>
+            <button className="btn btn-secondary" onClick={() => setProgress(0)} disabled={progress === 0}>{t('stopBackup')}</button>
           )}
           {backupMode === 'scheduled' && editingJobId && (
             <button className="btn btn-secondary" onClick={() => {
@@ -1405,16 +1413,16 @@ function App() {
               setExcludeList('')
               setBackupType('directory')
               setActiveTab('scheduled')
-              showStatus('✖️ Édition annulée', 'info')
+              showStatus(`✖️ ${t('statusEditCancelled')}`, 'info')
             }}>
-              ✖️ Annuler
+              ✖️ {t('cancel')}
             </button>
           )}
 
           {/* Scheduled Jobs List */}
           {backupMode === 'scheduled' && scheduledJobs.length > 0 && (
             <div className="card" style={{marginTop: '30px'}}>
-              <h3 style={{marginTop: 0}}>📅 Jobs planifiés</h3>
+              <h3 style={{marginTop: 0}}>📅 {t('scheduledJobs')}</h3>
               {scheduledJobs.map(job => (
                 <div key={job.id} style={{
                   padding: '15px',
@@ -1449,11 +1457,11 @@ function App() {
                           setExcludeList(job.excludeList.join('\n'))
                           // Switch to backup tab to show the form
                           setActiveTab('backup')
-                          showStatus('✏️ Mode édition - modifiez et sauvegardez', 'info')
+                          showStatus(`✏️ ${t('editModeInfo')}`, 'info')
                           window.scrollTo({top: 0, behavior: 'smooth'})
                         }}
                       >
-                        ✏️ Éditer
+                        ✏️ {t('editJob')}
                       </button>
                       <button
                         className="btn btn-secondary"
@@ -1462,7 +1470,7 @@ function App() {
                           try {
                             await DeleteScheduledJob(job.id)
                             setScheduledJobs(scheduledJobs.filter(j => j.id !== job.id))
-                            showStatus('Job supprimé', 'success')
+                            showStatus(t('statusJobDeleted'), 'success')
                             // Cancel edit mode if deleting the job being edited
                             if (editingJobId === job.id) {
                               setEditingJobId(null)
@@ -1472,7 +1480,7 @@ function App() {
                           }
                         }}
                       >
-                        🗑️ Supprimer
+                        🗑️ {t('deleteJob')}
                       </button>
                     </div>
                   </div>
@@ -1484,7 +1492,7 @@ function App() {
           {/* Job History */}
           {jobHistory.length > 0 && (
             <div className="card" style={{marginTop: '30px'}}>
-              <h3 style={{marginTop: 0}}>📜 Historique des sauvegardes (dernières 6)</h3>
+              <h3 style={{marginTop: 0}}>📜 {t('backupHistory')}</h3>
               <div style={{maxHeight: '400px', overflowY: 'auto'}}>
                 {jobHistory.slice(0, 6).map(job => (
                   <div key={job.id} style={{
@@ -1519,11 +1527,11 @@ function App() {
                             // Re-run failed job
                             setBackupDirs(job.backupDirs.join('\n'))
                             setConfig({...config, 'backup-id': job.backupId, usevss: job.useVSS})
-                            showStatus('Configuration chargée, lancez le backup', 'success')
+                            showStatus(t('configLoaded'), 'success')
                             window.scrollTo({top: 0, behavior: 'smooth'})
                           }}
                         >
-                          🔄 Relancer
+                          🔄 {t('rerun')}
                         </button>
                       )}
                     </div>
@@ -1540,10 +1548,10 @@ function App() {
 
         {/* Restore Tab */}
         <div className={`tab-content ${activeTab === 'restore' ? 'active' : ''}`}>
-          <h2>Restauration</h2>
+          <h2>{t('restoreTitle')}</h2>
 
           <div className="form-group">
-            <label>Backup ID à restaurer</label>
+            <label>{t('backupIDToRestore')}</label>
             <input
               type="text"
               value={restoreBackupId || hostname}
@@ -1552,14 +1560,14 @@ function App() {
             />
           </div>
 
-          <button className="btn" onClick={handleListSnapshots}>📋 Lister les snapshots disponibles</button>
+          <button className="btn" onClick={handleListSnapshots}>📋 {t('listSnapshots')}</button>
 
           {showSnapshots && (
             <div style={{marginTop: '20px'}}>
-              <h3>Snapshots disponibles</h3>
+              <h3>{t('availableSnapshots')}</h3>
               <div className="grid">
                 {snapshots.length === 0 ? (
-                  <p style={{color: '#718096'}}>Aucun snapshot trouvé</p>
+                  <p style={{color: '#718096'}}>{t('noSnapshotFound')}</p>
                 ) : (
                   snapshots.map((snap, idx) => (
                     <div key={idx} className="card" style={{cursor: 'pointer'}}>
@@ -1573,7 +1581,7 @@ function App() {
                         style={{marginTop: '10px', width: '100%'}}
                         onClick={() => handleRestoreSnapshot(snap.id, snap.time)}
                       >
-                        Restaurer
+                        {t('restore')}
                       </button>
                     </div>
                   ))
@@ -1583,8 +1591,8 @@ function App() {
           )}
 
           <div className="info-box" style={{marginTop: '20px'}}>
-            💡 <strong>Restauration :</strong> Sélectionnez d'abord un Backup ID, puis listez les snapshots disponibles.<br/>
-            Vous pourrez ensuite choisir un snapshot spécifique et le répertoire de destination pour la restauration.
+            💡 <strong>{t('restoreInfo')}</strong> {t('restoreInfoText')}<br/>
+            {t('restoreInfoText2')}
           </div>
 
           {status.visible && activeTab === 'restore' && (
@@ -1594,7 +1602,7 @@ function App() {
 
         {/* About Tab */}
         <div className={`tab-content ${activeTab === 'about' ? 'active' : ''}`}>
-          <h2 style={{textAlign: 'center'}}>À propos</h2>
+          <h2 style={{textAlign: 'center'}}>{t('aboutTitle')}</h2>
 
           <img
             src="https://nimbus.rdem-systems.com/logo.webp"
@@ -1605,7 +1613,7 @@ function App() {
 
           <div style={{textAlign: 'center', marginTop: '30px'}}>
             <h3>Nimbus Backup</h3>
-            <p style={{color: '#718096', margin: '10px 0'}}>Version {appVersion}</p>
+            <p style={{color: '#718096', margin: '10px 0'}}>{t('version')} {appVersion}</p>
 
             {/* Upsell CTA */}
             <div style={{margin: '20px 0'}}>
@@ -1626,43 +1634,43 @@ function App() {
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#5568d3'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = '#667eea'}
               >
-                📦 Commander du stockage Nimbus Backup
+                📦 {t('orderStorageCTA')}
               </a>
             </div>
 
             <div className="grid" style={{marginTop: '30px', textAlign: 'left'}}>
               <div className="card">
-                <h3>✅ Fonctionnalités</h3>
+                <h3>✅ {t('features')}</h3>
                 <ul style={{lineHeight: 2, marginLeft: '20px'}}>
-                  <li>Sauvegarde répertoires & disques</li>
-                  <li>Machine complète (C:\, D:\, etc.)</li>
-                  <li>Restauration snapshots</li>
-                  <li>Support VSS (Shadow Copy)</li>
-                  <li>Déduplication & compression</li>
-                  <li>Interface Wails moderne</li>
+                  <li>{t('featuresList.directories')}</li>
+                  <li>{t('featuresList.machine')}</li>
+                  <li>{t('featuresList.restore')}</li>
+                  <li>{t('featuresList.vss')}</li>
+                  <li>{t('featuresList.dedup')}</li>
+                  <li>{t('featuresList.modern')}</li>
                 </ul>
               </div>
 
               <div className="card">
-                <h3>🚀 Technologie</h3>
+                <h3>🚀 {t('technology')}</h3>
                 <ul style={{lineHeight: 2, marginLeft: '20px'}}>
-                  <li>Wails v2 (Go + React)</li>
-                  <li>Performance native</li>
-                  <li>Interface moderne</li>
-                  <li>Logs de debug intégrés</li>
-                  <li>Pas de dépendance GPU</li>
+                  <li>{t('techList.wails')}</li>
+                  <li>{t('techList.performance')}</li>
+                  <li>{t('techList.interface')}</li>
+                  <li>{t('techList.logs')}</li>
+                  <li>{t('techList.nogpu')}</li>
                 </ul>
               </div>
             </div>
 
             <p style={{marginTop: '30px'}}>
-              <strong>© 2026 RDEM Systems</strong><br/>
+              <strong>{t('copyright')}</strong><br/>
               <a href="https://nimbus.rdem-systems.com" style={{color: '#667eea'}}>nimbus.rdem-systems.com</a>
             </p>
 
             <p style={{marginTop: '20px', color: '#718096', fontSize: '12px'}}>
-              Basé sur proxmoxbackupclient_go par tizbac<br/>
-              Interface Wails + React + Vite
+              {t('basedOn')}<br/>
+              {t('techStack')}
             </p>
           </div>
         </div>

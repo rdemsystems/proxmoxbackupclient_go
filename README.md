@@ -21,6 +21,7 @@ Don't want to self-host PBS? Use our managed service:
 ## ✨ Features
 
 ### GUI Interface (Recommended)
+- **🌍 Multi-language support** - French & English interface
 - User-friendly configuration with connection testing
 - Real-time backup progress with speed and ETA
 - VSS (Volume Shadow Copy) support for consistent backups
@@ -28,6 +29,17 @@ Don't want to self-host PBS? Use our managed service:
 - Snapshot browsing and restore
 - Automatic hostname detection
 - Debug logging for troubleshooting
+
+### 📸 Screenshots
+
+![Server Configuration](docs/screenshots/nimbus-gui-liste-servers.png)
+*Multi-PBS server management with status indicators*
+
+![Add Server Form](docs/screenshots/nimbus-gui-add-server-form.png)
+*Easy server configuration with connection testing*
+
+![One-Shot Backup](docs/screenshots/nimbus-gui-one-shot-backup.png)
+*Real-time backup progress with ETA and speed*
 
 ### Security & Quality
 - Input validation and credential sanitization
@@ -92,7 +104,6 @@ Always test your backups and verify restoration before relying on them in produc
 - Bandwidth limiting
 - Multi-core compression
 - Windows toast notifications
-- English translation
 
 ## 🔨 Building from Source
 
