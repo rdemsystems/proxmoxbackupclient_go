@@ -1550,6 +1550,24 @@ function App() {
         <div className={`tab-content ${activeTab === 'restore' ? 'active' : ''}`}>
           <h2>{t('restoreTitle')}</h2>
 
+          {/* BETA Warning */}
+          <div style={{
+            backgroundColor: '#FEF3C7',
+            border: '2px solid #F59E0B',
+            borderRadius: '8px',
+            padding: '12px',
+            marginBottom: '20px',
+            color: '#92400E'
+          }}>
+            <strong>⚠️ BETA FEATURE</strong>
+            <p style={{margin: '8px 0 0 0', fontSize: '14px'}}>
+              La restauration est en phase BETA. Supporte actuellement :
+              <br/>✅ Fichiers et dossiers simples
+              <br/>✅ Permissions basiques
+              <br/>❌ Symlinks, ACLs, attributs étendus (prochainement)
+            </p>
+          </div>
+
           <div className="form-group">
             <label>{t('backupIDToRestore')}</label>
             <input

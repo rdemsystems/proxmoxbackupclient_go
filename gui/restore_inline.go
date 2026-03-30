@@ -159,8 +159,8 @@ func RestoreSnapshotInline(opts RestoreOptions) error {
 	writeBackupLog(fmt.Sprintf("Downloaded %d bytes", len(pxarData)))
 	progress(0.80, "Archive downloaded")
 
-	// Save PXAR file
-	progress(0.85, "Saving archive...")
+	// Extract PXAR archive (BETA - basic files and directories only)
+	progress(0.85, "Extracting files...")
 
 	// Create destination directory if it doesn't exist
 	err = os.MkdirAll(opts.DestPath, 0755)
@@ -168,20 +168,39 @@ func RestoreSnapshotInline(opts RestoreOptions) error {
 		return fmt.Errorf("failed to create destination directory: %v", err)
 	}
 
-	pxarFile := filepath.Join(opts.DestPath, "backup.pxar")
-	err = os.WriteFile(pxarFile, pxarData, 0644)
+	// Parse and extract PXAR
+	reader := pbscommon.NewPXARReader(pxarData)
+	extracted, err := reader.ExtractAll(opts.DestPath)
 	if err != nil {
-		return fmt.Errorf("failed to save PXAR file: %v", err)
+		writeBackupLog(fmt.Sprintf("PXAR extraction failed: %v", err))
+		return fmt.Errorf("failed to extract archive: %v", err)
 	}
 
-	writeBackupLog(fmt.Sprintf("Saved PXAR file to: %s", pxarFile))
-	progress(0.95, "Archive saved")
+	// Count results
+	successCount := 0
+	skipCount := 0
+	dirCount := 0
+	for _, f := range extracted {
+		if f.Skipped {
+			skipCount++
+			writeBackupLog(fmt.Sprintf("SKIPPED: %s - %s", f.Path, f.SkipReason))
+		} else if f.IsDir {
+			dirCount++
+		} else {
+			successCount++
+		}
+	}
 
-	// Note: Full PXAR extraction would require implementing the PXAR format parser
-	// For now, we save the raw PXAR file which can be extracted using proxmox tools
-	// or by implementing a PXAR reader in the future
+	writeBackupLog(fmt.Sprintf("Extraction complete: %d files, %d dirs, %d skipped",
+		successCount, dirCount, skipCount))
+	progress(0.95, fmt.Sprintf("Extracted %d files", successCount))
 
 	progress(1.0, "Restore completed")
+
+	// Return warning if files were skipped
+	if skipCount > 0 {
+		return fmt.Errorf("restore completed with %d skipped files (see logs)", skipCount)
+	}
 
 	return nil
 }
