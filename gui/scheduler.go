@@ -25,8 +25,9 @@ type ScheduledJob struct {
 	UseVSS       bool     `json:"useVSS"`
 	BackupType   string   `json:"backupType"`
 	ExcludeList  []string `json:"excludeList"`
-	LastRun      string   `json:"lastRun,omitempty"`  // ISO timestamp
-	NextRun      string   `json:"nextRun,omitempty"`  // ISO timestamp
+	Compression  string   `json:"compression"` // "fastest", "default", "better", "best"
+	LastRun      string   `json:"lastRun,omitempty"` // ISO timestamp
+	NextRun      string   `json:"nextRun,omitempty"` // ISO timestamp
 	Enabled      bool     `json:"enabled"`
 }
 
@@ -510,6 +511,12 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 	// Use StartBackup to route through mode detection (service or direct)
 	writeDebugLog(fmt.Sprintf("[Scheduled Job] Executing via StartBackup (mode: %s)", a.mode.String()))
 
+	// Default to "fastest" if compression not set in job
+	compression := job.Compression
+	if compression == "" {
+		compression = "fastest"
+	}
+
 	err := a.StartBackup(
 		job.BackupType,
 		job.BackupDirs,
@@ -517,6 +524,7 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 		job.ExcludeList,
 		job.BackupID,
 		job.UseVSS,
+		compression,
 	)
 
 	// Add history entry

@@ -38,13 +38,14 @@ func ListSnapshotsInline(baseURL, authID, secret, datastore, namespace, certFing
 
 	// Create PBS client
 	client := &pbscommon.PBSClient{
-		BaseURL:         baseURL,
-		CertFingerPrint: certFingerprint,
-		AuthID:          authID,
-		Secret:          secret,
-		Datastore:       datastore,
-		Namespace:       namespace,
-		Insecure:        certFingerprint != "",
+		BaseURL:          baseURL,
+		CertFingerPrint:  certFingerprint,
+		AuthID:           authID,
+		Secret:           secret,
+		Datastore:        datastore,
+		Namespace:        namespace,
+		Insecure:         certFingerprint != "",
+		CompressionLevel: pbscommon.CompressionFastest, // Default for listing
 		Manifest: pbscommon.BackupManifest{
 			BackupID: backupID,
 		},
@@ -116,13 +117,14 @@ func RestoreSnapshotInline(opts RestoreOptions) error {
 
 	// Create PBS client
 	client := &pbscommon.PBSClient{
-		BaseURL:         opts.BaseURL,
-		CertFingerPrint: opts.CertFingerprint,
-		AuthID:          opts.AuthID,
-		Secret:          opts.Secret,
-		Datastore:       opts.Datastore,
-		Namespace:       opts.Namespace,
-		Insecure:        opts.CertFingerprint != "",
+		BaseURL:          opts.BaseURL,
+		CertFingerPrint:  opts.CertFingerprint,
+		AuthID:           opts.AuthID,
+		Secret:           opts.Secret,
+		Datastore:        opts.Datastore,
+		Namespace:        opts.Namespace,
+		Insecure:         opts.CertFingerprint != "",
+		CompressionLevel: pbscommon.CompressionFastest, // Default for restore
 		Manifest: pbscommon.BackupManifest{
 			BackupID:   opts.BackupID,
 			BackupTime: opts.SnapshotTime.Unix(),

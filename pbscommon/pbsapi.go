@@ -25,6 +25,37 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// CompressionLevel defines the Zstd compression level
+type CompressionLevel string
+
+const (
+	// CompressionFastest - Fastest compression, lower CPU usage (~30-40% faster)
+	CompressionFastest CompressionLevel = "fastest"
+	// CompressionDefault - Balanced compression/speed (zstd default level 3)
+	CompressionDefault CompressionLevel = "default"
+	// CompressionBetter - Better compression ratio, higher CPU usage
+	CompressionBetter CompressionLevel = "better"
+	// CompressionBest - Best compression ratio, highest CPU usage
+	CompressionBest CompressionLevel = "best"
+)
+
+// ParseCompressionLevel converts a string to CompressionLevel
+// Returns CompressionFastest if invalid or empty
+func ParseCompressionLevel(level string) CompressionLevel {
+	switch strings.ToLower(level) {
+	case "fastest", "fast":
+		return CompressionFastest
+	case "default", "":
+		return CompressionDefault
+	case "better":
+		return CompressionBetter
+	case "best", "max":
+		return CompressionBest
+	default:
+		return CompressionFastest // Default to fastest
+	}
+}
+
 type IndexCreateResp struct {
 	WriterID int `json:"data"`
 }
@@ -99,8 +130,9 @@ type PBSClient struct {
 	Client    http.Client
 	TLSConfig tls.Config
 
-	WritersManifest map[uint64]int
-	SkippedFiles    []string // Track files/dirs skipped during backup
+	WritersManifest  map[uint64]int
+	SkippedFiles     []string         // Track files/dirs skipped during backup
+	CompressionLevel CompressionLevel // Zstd compression level (default: fastest)
 }
 
 const PBS_FIXED_CHUNK_SIZE = 4 * 1024 * 1024
@@ -338,8 +370,20 @@ func (pbs *PBSClient) UploadChunk(writerid uint64, digest string, chunkdata []by
 		outBuffer = append(outBuffer, blobCompressedMagic...)
 		compressedData := make([]byte, 0)
 
-		//opt := zstd.WithEncoderLevel(zstd.SpeedFastest)
-		w, _ := zstd.NewWriter(nil)
+		// Select compression level based on client configuration
+		var encoderLevel zstd.EncoderLevel
+		switch pbs.CompressionLevel {
+		case CompressionFastest:
+			encoderLevel = zstd.SpeedFastest
+		case CompressionBetter:
+			encoderLevel = zstd.SpeedBetterCompression
+		case CompressionBest:
+			encoderLevel = zstd.SpeedBestCompression
+		default: // CompressionDefault or empty
+			encoderLevel = zstd.SpeedDefault
+		}
+
+		w, _ := zstd.NewWriter(nil, zstd.WithEncoderLevel(encoderLevel))
 		compressedData = w.EncodeAll(chunkdata, compressedData)
 		checksum := crc32.Checksum(compressedData, crc32.IEEETable)
 		//binary.Write(outBuffer, binary.LittleEndian, checksum)

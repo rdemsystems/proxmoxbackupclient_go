@@ -22,7 +22,7 @@ type Server struct {
 // BackupHandler interface that the service must implement
 // NOTE: StartBackup will be called in a goroutine (async), so it must be thread-safe
 type BackupHandler interface {
-	StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool) error
+	StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool, compression string) error
 	GetConfigWithHostname() map[string]interface{}
 	GetScheduledJobsForAPI() []map[string]interface{}
 	SaveScheduledJobFromMap(job map[string]interface{}) error
@@ -161,6 +161,12 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Call StartBackup (service App is in standalone mode to execute directly)
+		// Default to "fastest" if compression not specified
+		compression := req.Compression
+		if compression == "" {
+			compression = "fastest"
+		}
+
 		err := s.app.StartBackup(
 			req.BackupType,
 			req.BackupDirs,
@@ -168,6 +174,7 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 			req.ExcludeList,
 			req.BackupID,
 			req.UseVSS,
+			compression,
 		)
 
 		// Update final status if callbacks didn't fire

@@ -8,6 +8,7 @@ type BackupRequest struct {
 	DriveLetters []string `json:"drive_letters,omitempty"`
 	ExcludeList  []string `json:"exclude_list,omitempty"`
 	UseVSS       bool     `json:"use_vss"`
+	Compression  string   `json:"compression,omitempty"` // "fastest", "default", "better", "best"
 }
 
 // BackupResponse represents the result of a backup operation

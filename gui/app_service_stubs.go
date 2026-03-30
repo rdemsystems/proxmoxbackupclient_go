@@ -31,8 +31,8 @@ func (a *App) GetConfigWithHostname() map[string]interface{} {
 
 // StartBackup starts a backup job
 // Service implementation using RunBackupInline
-func (a *App) StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool) error {
-	writeDebugLog(fmt.Sprintf("[Service] StartBackup called: type=%s, dirs=%v, id=%s, vss=%v", backupType, backupDirs, backupID, useVSS))
+func (a *App) StartBackup(backupType string, backupDirs, driveLetters, excludeList []string, backupID string, useVSS bool, compression string) error {
+	writeDebugLog(fmt.Sprintf("[Service] StartBackup called: type=%s, dirs=%v, id=%s, vss=%v, compression=%s", backupType, backupDirs, backupID, useVSS, compression))
 
 	if a.config == nil {
 		return fmt.Errorf("configuration not loaded")
@@ -42,6 +42,12 @@ func (a *App) StartBackup(backupType string, backupDirs, driveLetters, excludeLi
 	if backupID == "" {
 		backupID, _ = os.Hostname()
 		writeDebugLog(fmt.Sprintf("[Backup ID] Empty backup-id, using hostname: %s", backupID))
+	}
+
+	// Default to "fastest" if compression is empty
+	if compression == "" {
+		compression = "fastest"
+		writeDebugLog("[Compression] Using default: fastest")
 	}
 
 	// Merge directories: backupDirs for directory backup, driveLetters for machine backup
@@ -64,6 +70,7 @@ func (a *App) StartBackup(backupType string, backupDirs, driveLetters, excludeLi
 		BackupID:        backupID,
 		BackupType:      backupType,
 		UseVSS:          useVSS,
+		Compression:     compression,
 		OnProgress: func(percent float64, message string) {
 			writeDebugLog(fmt.Sprintf("[Backup Progress] %.1f%% - %s", percent, message))
 		},

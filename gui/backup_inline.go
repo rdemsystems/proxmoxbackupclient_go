@@ -34,6 +34,7 @@ type BackupOptions struct {
 	BackupID        string
 	BackupType      string // "host" for directory, "vm" for machine
 	UseVSS          bool
+	Compression     string   // Compression level: "fastest", "default", "better", "best"
 	OnProgress      func(percent float64, message string)
 	OnComplete      func(success bool, message string)
 }
@@ -398,14 +399,16 @@ func RunBackupInline(opts BackupOptions) error {
 
 		if analysis.ShouldSplit {
 			// Check each folder individually for existing backups
+			compressionLevel := pbscommon.ParseCompressionLevel(opts.Compression)
 			tempClient := &pbscommon.PBSClient{
-				BaseURL:         opts.BaseURL,
-				CertFingerPrint: opts.CertFingerprint,
-				AuthID:          opts.AuthID,
-				Secret:          opts.Secret,
-				Datastore:       opts.Datastore,
-				Namespace:       opts.Namespace,
-				Insecure:        opts.CertFingerprint != "",
+				BaseURL:          opts.BaseURL,
+				CertFingerPrint:  opts.CertFingerprint,
+				AuthID:           opts.AuthID,
+				Secret:           opts.Secret,
+				Datastore:        opts.Datastore,
+				Namespace:        opts.Namespace,
+				Insecure:         opts.CertFingerprint != "",
+				CompressionLevel: compressionLevel,
 			}
 
 			allFoldersBackedUp := true
@@ -555,15 +558,20 @@ func runBackupInlineInternal(opts BackupOptions) error {
 
 	writeBackupLog("[DEBUG] Creating PBS client struct")
 
+	// Parse compression level (default to fastest if empty or invalid)
+	compressionLevel := pbscommon.ParseCompressionLevel(opts.Compression)
+	writeBackupLog(fmt.Sprintf("[DEBUG] Compression level: %s", compressionLevel))
+
 	// Create PBS client
 	client := &pbscommon.PBSClient{
-		BaseURL:         opts.BaseURL,
-		CertFingerPrint: opts.CertFingerprint,
-		AuthID:          opts.AuthID,
-		Secret:          opts.Secret,
-		Datastore:       opts.Datastore,
-		Namespace:       opts.Namespace,
-		Insecure:        opts.CertFingerprint != "",
+		BaseURL:          opts.BaseURL,
+		CertFingerPrint:  opts.CertFingerprint,
+		AuthID:           opts.AuthID,
+		Secret:           opts.Secret,
+		Datastore:        opts.Datastore,
+		Namespace:        opts.Namespace,
+		Insecure:         opts.CertFingerprint != "",
+		CompressionLevel: compressionLevel,
 		Manifest: pbscommon.BackupManifest{
 			BackupID: opts.BackupID,
 		},
