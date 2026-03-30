@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // PXARReader reads and extracts PXAR archives
@@ -183,8 +184,9 @@ func (pr *PXARReader) ExtractAll(destDir string) ([]PXARExtractedFile, error) {
 					} else {
 						// Set modification time
 						if currentEntry.mtime.secs > 0 {
-							modTime := int64(currentEntry.mtime.secs)
-							os.Chtimes(fullPath, os.ModePerm.Perm(), os.ModePerm.Perm()) // Access time = ModTime
+							modTime := time.Unix(int64(currentEntry.mtime.secs), 0)
+							// Use same time for access and modification
+							_ = os.Chtimes(fullPath, modTime, modTime)
 						}
 
 						extracted = append(extracted, PXARExtractedFile{
