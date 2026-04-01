@@ -71,6 +71,12 @@ func (l *RotatingLogger) Write(message string) error {
 		return fmt.Errorf("failed to write to log: %w", err)
 	}
 
+	// CRITICAL: Force immediate flush to disk to prevent data loss on crashes
+	// This ensures log data is persisted even if process terminates unexpectedly
+	if err := l.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync log to disk: %w", err)
+	}
+
 	l.currentSize += int64(n)
 	return nil
 }

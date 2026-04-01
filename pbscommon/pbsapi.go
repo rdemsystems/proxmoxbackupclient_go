@@ -887,30 +887,3 @@ func (pbs *PBSClient) GetChunkData(digest string) ([]byte, error) {
 
 }
 
-// KeepAlive sends a lightweight request to PBS to keep the session active
-// This prevents the dynamic writer from being expired during long backups
-func (pbs *PBSClient) KeepAlive() error {
-	// Use a simple API call that doesn't modify anything
-	// GET /api2/json/version is perfect - it's lightweight and always available
-	req, err := http.NewRequest("GET", pbs.BaseURL+"/api2/json/version", nil)
-	if err != nil {
-		return fmt.Errorf("failed to create keep-alive request: %w", err)
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("PBSAPIToken=%s:%s", pbs.AuthID, pbs.Secret))
-
-	resp, err := pbs.Client.Do(req)
-	if err != nil {
-		return fmt.Errorf("keep-alive request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Drain the body to allow connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("keep-alive returned status %d", resp.StatusCode)
-	}
-
-	return nil
-}

@@ -10,6 +10,7 @@ import (
 	"hash"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -681,36 +682,22 @@ func backupDirectory(client *pbscommon.PBSClient, newchunk, reusechunk, failedch
 	return backupReal(client, newchunk, reusechunk, failedchunk, backupdir, progress)
 }
 
-func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk, failedchunk *atomic.Uint64, backupdir string, progress func(float64, string)) error {
-	client.Connect(false, "host")
-	knownChunks := hashmap.New[string, bool]()
-
-	// Start keep-alive goroutine to maintain PBS session during long backups
-	keepAliveCtx, keepAliveCancel := context.WithCancel(context.Background())
-	defer keepAliveCancel() // Stop keep-alive when backup completes or fails
-
-	go func() {
-		ticker := time.NewTicker(30 * time.Second) // Keep-alive every 30 seconds
-		defer ticker.Stop()
-
-		writeBackupLog("[KeepAlive] Started - will ping PBS every 30 seconds")
-
-		for {
-			select {
-			case <-keepAliveCtx.Done():
-				writeBackupLog("[KeepAlive] Stopped (backup finished)")
-				return
-			case <-ticker.C:
-				writeBackupLog("[KeepAlive] Sending ping to PBS...")
-				if err := client.KeepAlive(); err != nil {
-					writeBackupLog(fmt.Sprintf("[KeepAlive] WARNING: Ping failed: %v", err))
-					// Continue anyway - don't stop the backup for keep-alive failures
-				} else {
-					writeBackupLog("[KeepAlive] Ping successful")
-				}
-			}
+func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk, failedchunk *atomic.Uint64, backupdir string, progress func(float64, string)) (returnErr error) {
+	// Panic recovery - critical to prevent silent crashes during backup
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("CRITICAL: Backup panic occurred: %v", r)
+			writeBackupLog(errMsg)
+			// Get stack trace
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			writeBackupLog(fmt.Sprintf("Stack trace:\n%s", buf[:n]))
+			returnErr = fmt.Errorf("backup panic: %v", r)
 		}
 	}()
+
+	client.Connect(false, "host")
+	knownChunks := hashmap.New[string, bool]()
 
 	// Start background scan to calculate total size
 	totalSize := &atomic.Uint64{}
