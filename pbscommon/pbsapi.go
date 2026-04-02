@@ -297,7 +297,15 @@ func (pbs *PBSClient) CreateDynamicIndex(name string) (uint64, error) {
 	fmt.Printf("Archive name: %s\n", name)
 	fmt.Printf("BaseURL: %s\n", pbs.BaseURL)
 
-	req, err := http.NewRequest("POST", pbs.BaseURL+"/dynamic_index", bytes.NewBuffer([]byte(fmt.Sprintf("{\"archive-name\": \"%s\"}", name))))
+	// Use json.Marshal to properly escape special characters and ensure valid JSON
+	payload := map[string]string{"archive-name": name}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to marshal JSON: %v\n", err)
+		return 0, fmt.Errorf("failed to marshal JSON payload: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", pbs.BaseURL+"/dynamic_index", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		fmt.Printf("ERROR: Failed to create request: %v\n", err)
 		return 0, err
