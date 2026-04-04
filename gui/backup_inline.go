@@ -362,7 +362,20 @@ func formatDuration(d time.Duration) string {
 }
 
 // RunBackupInline performs a backup without external binaries
-func RunBackupInline(opts BackupOptions) error {
+func RunBackupInline(opts BackupOptions) (returnErr error) {
+	// CRITICAL: Panic recovery to prevent silent goroutine death (scheduler launches backups in goroutines)
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("CRITICAL: Backup panic in RunBackupInline: %v", r)
+			writeBackupLog(errMsg)
+			// Get stack trace
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			writeBackupLog(fmt.Sprintf("Stack trace:\n%s", buf[:n]))
+			returnErr = fmt.Errorf("backup panic: %v", r)
+		}
+	}()
+
 	startTime := time.Now()
 	writeBackupLog("Starting inline backup")
 
@@ -482,7 +495,20 @@ func RunBackupInline(opts BackupOptions) error {
 }
 
 // runBackupInlineInternal is the actual backup implementation (called by RunBackupInline)
-func runBackupInlineInternal(opts BackupOptions) error {
+func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
+	// CRITICAL: Panic recovery for split jobs
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("CRITICAL: Backup panic in runBackupInlineInternal: %v", r)
+			writeBackupLog(errMsg)
+			// Get stack trace
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			writeBackupLog(fmt.Sprintf("Stack trace:\n%s", buf[:n]))
+			returnErr = fmt.Errorf("backup panic: %v", r)
+		}
+	}()
+
 	startTime := time.Now()
 
 	// Acquire backup lock for this destination to prevent concurrent backups

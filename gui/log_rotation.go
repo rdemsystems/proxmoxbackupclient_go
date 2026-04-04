@@ -66,6 +66,10 @@ func (l *RotatingLogger) Write(message string) error {
 	}
 
 	// Write message
+	// CRITICAL: Check if file is nil (can happen if rotation failed)
+	if l.file == nil {
+		return fmt.Errorf("log file is nil, cannot write (rotation may have failed)")
+	}
 	n, err := l.file.WriteString(message)
 	if err != nil {
 		return fmt.Errorf("failed to write to log: %w", err)
@@ -115,7 +119,26 @@ func (l *RotatingLogger) rotate() error {
 	// Create new log file
 	file, err := os.OpenFile(l.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to create new log file: %w", err)
+		// CRITICAL: If we can't create new log file, try to reopen the rotated file
+		// to prevent losing all subsequent logs
+		fmt.Fprintf(os.Stderr, "CRITICAL: Failed to create new log file %s: %v\n", l.path, err)
+		fmt.Fprintf(os.Stderr, "Attempting to reopen rotated file %s\n", rotatedPath)
+
+		// Try to reopen the rotated file as fallback
+		fallbackFile, fallbackErr := os.OpenFile(rotatedPath, os.O_WRONLY|os.O_APPEND, 0600)
+		if fallbackErr != nil {
+			// Can't reopen rotated file either - this is FATAL
+			fmt.Fprintf(os.Stderr, "FATAL: Cannot reopen rotated file: %v\n", fallbackErr)
+			fmt.Fprintf(os.Stderr, "Logging is now BROKEN - backup may fail\n")
+			// Set to nil to trigger fallback to stderr in writeLogToLogger
+			l.file = nil
+			return fmt.Errorf("failed to create new log file and reopen rotated file: %w", err)
+		}
+
+		// Successfully reopened rotated file - continue using it
+		l.file = fallbackFile
+		fmt.Fprintf(os.Stderr, "WARNING: Using rotated file %s for continued logging\n", rotatedPath)
+		return nil
 	}
 
 	l.file = file
