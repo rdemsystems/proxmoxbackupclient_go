@@ -133,6 +133,43 @@ type SplitJob struct {
 	ParentID   string   `json:"parent_id"` // Original job ID
 }
 
+// getSubFolders returns direct sub-folders of a path with their sizes
+func getSubFolders(path string) ([]FolderInfo, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	subFolders := make([]FolderInfo, 0)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subPath := filepath.Join(path, entry.Name())
+			size, err := calculateDirSize(subPath)
+
+			subFolder := FolderInfo{
+				Path: subPath,
+				Name: entry.Name(),
+				Size: size,
+			}
+
+			// If access denied, mark it but don't skip
+			if err != nil && strings.Contains(err.Error(), "access denied") {
+				subFolder.AccessDenied = true
+				subFolder.Size = 10 * 1024 * 1024 * 1024 // Estimate 10GB
+			}
+
+			subFolders = append(subFolders, subFolder)
+		}
+	}
+
+	// Sort by size (largest first)
+	sort.Slice(subFolders, func(i, j int) bool {
+		return subFolders[i].Size > subFolders[j].Size
+	})
+
+	return subFolders, nil
+}
+
 // CreateSplitJobs creates multiple smaller jobs from a large backup
 // Uses bin-packing algorithm to distribute folders evenly
 // Folders with AccessDenied are placed in separate jobs (will use VSS)
@@ -189,8 +226,31 @@ func CreateSplitJobs(analysis *BackupAnalysis, baseBackupID string, hostname str
 		}}
 	}
 
-	// Create jobs for DENIED folders FIRST (each in separate job with descriptive ID)
-	for _, folder := range deniedFolders {
+	// Create one job per top-level folder (both denied and accessible)
+	// If a folder > MaxChunkSize, subdivide it into sub-folders
+	allFolders := append(deniedFolders, accessibleFolders...)
+
+	for _, folder := range allFolders {
+		// If folder is too large, subdivide into direct sub-folders
+		if folder.Size > MaxChunkSize && !folder.AccessDenied {
+			subFolders, err := getSubFolders(folder.Path)
+			if err == nil && len(subFolders) > 1 {
+				// Create one job per sub-folder
+				for _, subFolder := range subFolders {
+					backupID := GenerateBackupID(hostname, subFolder.Path)
+					jobs = append(jobs, SplitJob{
+						Folders:   []string{subFolder.Path},
+						TotalSize: subFolder.Size,
+						BackupID:  backupID, // e.g., JDS-SRV-1_D_DATA_app
+						ParentID:  baseBackupID,
+					})
+				}
+				continue
+			}
+			// If subdivision failed or only 1 subfolder, fall through to single job
+		}
+
+		// Single job for this folder
 		backupID := folder.BackupID
 		if backupID == "" {
 			backupID = GenerateBackupID(hostname, folder.Path)
@@ -198,51 +258,16 @@ func CreateSplitJobs(analysis *BackupAnalysis, baseBackupID string, hostname str
 		jobs = append(jobs, SplitJob{
 			Folders:   []string{folder.Path},
 			TotalSize: folder.Size,
-			BackupID:  backupID, // e.g., JDS-SRV-1_D_DATA
+			BackupID:  backupID, // e.g., JDS-SRV-1_D_DATA, JDS-SRV-1_E_USERS
 			ParentID:  baseBackupID,
 		})
 	}
 
-	// Bin-packing for accessible folders
-	currentJob := SplitJob{
-		Folders:  make([]string, 0),
-		ParentID: baseBackupID,
-	}
-	currentSize := uint64(0)
-
-	for _, folder := range accessibleFolders {
-		// If adding this folder exceeds MaxChunkSize and we already have folders, start new job
-		if currentSize+folder.Size > MaxChunkSize && len(currentJob.Folders) > 0 {
-			jobs = append(jobs, currentJob)
-			currentJob = SplitJob{
-				Folders:  make([]string, 0),
-				ParentID: baseBackupID,
-			}
-			currentSize = 0
-		}
-
-		currentJob.Folders = append(currentJob.Folders, folder.Path)
-		currentSize += folder.Size
-		currentJob.TotalSize = currentSize
-	}
-
-	// Add last job if it has folders
-	if len(currentJob.Folders) > 0 {
-		jobs = append(jobs, currentJob)
-	}
-
-	// Set indices and backup IDs for mixed jobs (not denied folders)
+	// Set indices
 	totalJobs := len(jobs)
-	splitIndex := 1
 	for i := range jobs {
 		jobs[i].Index = i + 1
 		jobs[i].TotalJobs = totalJobs
-
-		// Only add split suffix for multi-folder jobs
-		if jobs[i].BackupID == "" {
-			jobs[i].BackupID = fmt.Sprintf("%s-split-%d-of-%d", baseBackupID, splitIndex, totalJobs)
-			splitIndex++
-		}
 	}
 
 	return jobs

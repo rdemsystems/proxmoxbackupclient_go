@@ -65,7 +65,7 @@ func ListSnapshotsInline(baseURL, authID, secret, datastore, namespace, certFing
 	result := make([]SnapshotInfo, 0)
 	for _, m := range manifests {
 		// Filter by backup ID if specified (partial match to support split backups)
-		// Example: searching "JDS-SRV-1" will match "JDS-SRV-1-split-1-of-2"
+		// Example: searching "JDS-SRV-1" will match "JDS-SRV-1_D_DATA" or "JDS-SRV-1_PART-A"
 		if backupID != "" && !strings.Contains(m.BackupID, backupID) {
 			continue
 		}
