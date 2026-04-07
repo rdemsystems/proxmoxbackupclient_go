@@ -433,16 +433,25 @@ func RunBackupInline(opts BackupOptions) (returnErr error) {
 				folderBackupID := GenerateBackupID(hostname, analysis.Folders[i].Path)
 				analysis.Folders[i].BackupID = folderBackupID
 
-				// Check if this specific folder has a previous backup
-				tempClient.Manifest = pbscommon.BackupManifest{BackupID: folderBackupID}
-				tempClient.Connect(false, "host")
-				previousDidx, err := tempClient.DownloadPreviousToBytes("backup.pxar.didx")
+				// Check if this specific folder has a previous backup using REST API
+				// DON'T use Connect() here - it creates a backup session that needs Finish()
+				snapshots, err := tempClient.ListSnapshots()
+				backupExists := false
 
-				if err == nil && len(previousDidx) > 0 {
-					analysis.Folders[i].BackupExists = true
+				if err == nil {
+					// Check if any snapshot matches this BackupID
+					for _, snap := range snapshots {
+						if snap.BackupID == folderBackupID {
+							backupExists = true
+							break
+						}
+					}
+				}
+
+				analysis.Folders[i].BackupExists = backupExists
+				if backupExists {
 					writeBackupLog(fmt.Sprintf("[Auto-Split] Folder %s: Previous backup found (skip splitting)", folderBackupID))
 				} else {
-					analysis.Folders[i].BackupExists = false
 					allFoldersBackedUp = false
 					writeBackupLog(fmt.Sprintf("[Auto-Split] Folder %s: First backup (will split if large)", folderBackupID))
 				}
