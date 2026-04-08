@@ -706,6 +706,7 @@ func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
 
 func backupDirectory(client *pbscommon.PBSClient, newchunk, reusechunk, failedchunk *atomic.Uint64, backupdir string, usevss bool, progress func(float64, string)) error {
 	writeBackupLog(fmt.Sprintf("Starting backup of %s", backupdir))
+	originalPath := backupdir
 
 	if usevss {
 		return snapshot.CreateVSSSnapshot([]string{backupdir}, func(snaps map[string]snapshot.SnapShot) error {
@@ -713,14 +714,14 @@ func backupDirectory(client *pbscommon.PBSClient, newchunk, reusechunk, failedch
 				backupdir = snap.FullPath
 				break
 			}
-			return backupReal(client, newchunk, reusechunk, failedchunk, backupdir, progress)
+			return backupReal(client, newchunk, reusechunk, failedchunk, backupdir, originalPath, usevss, progress)
 		})
 	}
 
-	return backupReal(client, newchunk, reusechunk, failedchunk, backupdir, progress)
+	return backupReal(client, newchunk, reusechunk, failedchunk, backupdir, originalPath, usevss, progress)
 }
 
-func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk, failedchunk *atomic.Uint64, backupdir string, progress func(float64, string)) (returnErr error) {
+func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk, failedchunk *atomic.Uint64, backupdir string, originalPath string, vssUsed bool, progress func(float64, string)) (returnErr error) {
 	// Panic recovery - critical to prevent silent crashes during backup
 	defer func() {
 		if r := recover(); r != nil {
@@ -751,6 +752,17 @@ func backupReal(client *pbscommon.PBSClient, newchunk, reusechunk, failedchunk *
 
 	archive := &pbscommon.PXARArchive{}
 	archive.ArchiveName = "backup.pxar.didx"
+
+	// Inject backup metadata into the PXAR archive root
+	hostname, _ := os.Hostname()
+	metaJSON, err := GenerateBackupMeta(client.Manifest.BackupID, originalPath, hostname, vssUsed)
+	if err != nil {
+		writeBackupLog(fmt.Sprintf("WARNING: Failed to generate backup metadata: %v", err))
+	} else {
+		archive.VirtualFiles = map[string][]byte{
+			BackupMetaFilename: metaJSON,
+		}
+	}
 
 	previousDidx, err := client.DownloadPreviousToBytes(archive.ArchiveName)
 	if err != nil {

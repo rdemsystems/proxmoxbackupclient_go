@@ -42,7 +42,32 @@
 
 ## 🔴 P0 - CRITIQUE (À faire maintenant)
 
-### 🆕 NTFS Metadata Fidelity - CRITIQUE ⚠️
+### 🆕 Backup Metadata & NTFS Fidelity - CRITIQUE ⚠️
+
+#### Étape 0 : Métadonnées de backup (backup-id → chemin original)
+**Problème:** `GenerateBackupID()` sanitize les noms de dossiers (espaces→tirets, accents supprimés).
+Le backup-id `JDS-SRV-1_D_DATA_BE_stephan_archive-dossiers-solidworks` ne permet plus de retrouver
+le chemin original `D:\DATA\BE\stephan\archive dossiers solidworks`.
+
+**Solution:** Fichier `.nimbus_backup_meta.json` stocké dans chaque archive PXAR :
+```json
+{
+  "backup_id": "JDS-SRV-1_D_DATA_BE_stephan_archive-dossiers-solidworks",
+  "original_path": "D:\\DATA\\BE\\stephan\\archive dossiers solidworks",
+  "hostname": "JDS-SRV-1",
+  "backup_time": "2026-04-08T22:15:00Z",
+  "client_version": "0.2.51",
+  "os": "windows",
+  "vss_used": true
+}
+```
+
+**Tâches:**
+- [ ] Créer type `BackupMeta` dans `gui/backup_meta.go`
+- [ ] Écrire `.nimbus_backup_meta.json` à la racine de l'archive PXAR avant le backup
+- [ ] Lire et afficher les metadata dans l'UI restore (nom original du dossier)
+
+#### Étape 1 : NTFS Metadata Fidelity
 **Problème:** Les backups Windows perdent les ACLs, Alternate Data Streams, et timestamps NTFS complets.
 **Impact:** Restauration incomplète - permissions perdues, attributs DOS absents.
 **Référence audit:** Score 2/10 NTFS Fidelity

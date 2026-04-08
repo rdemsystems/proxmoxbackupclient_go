@@ -193,6 +193,10 @@ type PXARArchive struct {
 
 	catalog_pos  uint64
 	SkippedFiles []string // Track files/directories skipped due to access errors
+
+	// VirtualFiles are injected at the root of the archive before real files.
+	// Key = filename (e.g. ".nimbus_backup_meta.json"), Value = content bytes.
+	VirtualFiles map[string][]byte
 }
 
 //This function will flush the internal buffer and update position
@@ -355,6 +359,31 @@ func (a *PXARArchive) WriteDir(path string, dirname string, toplevel bool) (Cata
 	goodbyteitems := make([]GoodByeItem, 0)
 	catalog_files := make([]CatalogFile, 0)
 	catalog_dirs := make([]CatalogDir, 0)
+
+	// Inject virtual files (metadata) at the root of the archive
+	if toplevel && len(a.VirtualFiles) > 0 {
+		// Sort keys for deterministic output
+		vfNames := make([]string, 0, len(a.VirtualFiles))
+		for name := range a.VirtualFiles {
+			vfNames = append(vfNames, name)
+		}
+		sort.Strings(vfNames)
+
+		now := uint64(entry.mtime.secs)
+		for _, name := range vfNames {
+			startpos := a.pos
+			F, err := a.WriteVirtualFile(name, a.VirtualFiles[name], now)
+			if err != nil {
+				return CatalogDir{}, fmt.Errorf("failed to write virtual file %s: %w", name, err)
+			}
+			catalog_files = append(catalog_files, F)
+			goodbyteitems = append(goodbyteitems, GoodByeItem{
+				offset: startpos,
+				hash:   siphash.Hash(0x83ac3f1cfbb450db, 0xaa4f1b6879369fbd, []byte(name)),
+				len:    a.pos - startpos,
+			})
+		}
+	}
 
 	for _, file := range files {
 		startpos := a.pos
@@ -594,5 +623,48 @@ func (a *PXARArchive) WriteFile(path string, basename string) (CatalogFile, erro
 		Name:  basename,
 		MTime: uint64(fileInfo.ModTime().Unix()),
 		Size:  uint64(fileInfo.Size()),
+	}, nil
+}
+
+// WriteVirtualFile writes an in-memory file into the PXAR archive.
+// Used for injecting metadata files (e.g. .nimbus_backup_meta.json) without a real file on disk.
+func (a *PXARArchive) WriteVirtualFile(filename string, data []byte, mtime uint64) (CatalogFile, error) {
+	fname_entry := &PXARFilenameEntry{
+		hdr: PXAR_FILENAME,
+		len: uint64(16) + uint64(len(filename)) + 1,
+	}
+	binary.Write(&a.buffer, binary.LittleEndian, fname_entry)
+	a.buffer.WriteString(filename)
+	a.buffer.WriteByte(0x00)
+
+	entry := &PXARFileEntry{
+		hdr:   PXAR_ENTRY,
+		len:   56,
+		mode:  IFREG | 0o444,
+		flags: 0,
+		uid:   1000,
+		gid:   1000,
+		mtime: MTime{
+			secs:    mtime,
+			nanos:   0,
+			padding: 0,
+		},
+	}
+	binary.Write(&a.buffer, binary.LittleEndian, entry)
+
+	binary.Write(&a.buffer, binary.LittleEndian, PXAR_PAYLOAD)
+	filesize := uint64(len(data)) + 16
+	binary.Write(&a.buffer, binary.LittleEndian, filesize)
+
+	a.buffer.Write(data)
+
+	if err := a.Flush(); err != nil {
+		return CatalogFile{}, err
+	}
+
+	return CatalogFile{
+		Name:  filename,
+		MTime: mtime,
+		Size:  uint64(len(data)),
 	}, nil
 }
