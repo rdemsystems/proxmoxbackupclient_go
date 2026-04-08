@@ -128,10 +128,10 @@ func (c *ChunkState) Init(newchunk *atomic.Uint64, reusechunk *atomic.Uint64, fa
 	c.chunkdigests = sha256.New()
 	c.current_chunk = make([]byte, 0)
 	c.C = pbscommon.Chunker{}
-	// Chunk size increased from 4MB to 8MB to reduce DIDX index size
-	// PBS has undocumented limits on dynamic index size (~1-2MB)
-	// Larger chunks = fewer chunks = smaller index (workaround for "Invalid string length" errors)
-	c.C.New(1024 * 1024 * 8)
+	// Chunk size avg = 4MB → max = 16MB (PBS hard limit on chunk size)
+	// Was 8MB (max=32MB) as workaround for "Invalid string length" errors,
+	// but the real cause was broken JSON encoding in CreateDynamicIndex (fixed in 16fbba8)
+	c.C.New(1024 * 1024 * 4)
 	c.reusechunk = reusechunk
 	c.newchunk = newchunk
 	c.failedchunk = failedchunk
