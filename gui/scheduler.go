@@ -495,6 +495,9 @@ func (a *App) HandleStartupRun() {
 	}
 }
 
+// schedulerTickCount tracks ticks for periodic verbose logging
+var schedulerTickCount int
+
 // checkAndRunScheduledJobs checks if any jobs need to run
 func (a *App) checkAndRunScheduledJobs() {
 	jobs, err := a.GetScheduledJobs()
@@ -503,23 +506,29 @@ func (a *App) checkAndRunScheduledJobs() {
 		return
 	}
 
+	schedulerTickCount++
+	// Log status every 15 minutes (15 ticks at 1 tick/min) instead of every minute
+	verbose := schedulerTickCount%15 == 1
+
 	if len(jobs) == 0 {
-		writeDebugLog("[Scheduler] No scheduled jobs found")
+		if verbose {
+			writeDebugLog("[Scheduler] No scheduled jobs found")
+		}
 		return
 	}
 
 	now := time.Now()
-	writeDebugLog(fmt.Sprintf("[Scheduler] Checking %d jobs at %s", len(jobs), now.Format("15:04:05")))
+	if verbose {
+		writeDebugLog(fmt.Sprintf("[Scheduler] Checking %d jobs at %s", len(jobs), now.Format("15:04:05")))
+	}
 
 	for _, job := range jobs {
 		if !job.Enabled {
-			writeDebugLog(fmt.Sprintf("[Scheduler] Job %s is disabled, skipping", job.Name))
 			continue
 		}
 
 		// Parse next run time
 		if job.NextRun == "" {
-			writeDebugLog(fmt.Sprintf("[Scheduler] Job %s has no NextRun time, skipping", job.Name))
 			continue
 		}
 
@@ -529,11 +538,15 @@ func (a *App) checkAndRunScheduledJobs() {
 			continue
 		}
 
-		writeDebugLog(fmt.Sprintf("[Scheduler] Job %s: NextRun=%s, Now=%s, ShouldRun=%v",
-			job.Name, nextRun.Format("15:04:05"), now.Format("15:04:05"), now.After(nextRun) && now.Before(nextRun.Add(2*time.Minute))))
+		shouldRun := now.After(nextRun) && now.Before(nextRun.Add(2*time.Minute))
+
+		if verbose {
+			writeDebugLog(fmt.Sprintf("[Scheduler] Job %s: NextRun=%s, Now=%s, ShouldRun=%v",
+				job.Name, nextRun.Format("15:04:05"), now.Format("15:04:05"), shouldRun))
+		}
 
 		// Check if it's time to run (within 2 minute window to avoid missing)
-		if now.After(nextRun) && now.Before(nextRun.Add(2*time.Minute)) {
+		if shouldRun {
 			writeDebugLog(fmt.Sprintf("[Scheduler] Executing scheduled job: %s", job.Name))
 			go a.executeScheduledJob(job)
 		}
@@ -606,11 +619,12 @@ func (a *App) executeScheduledJob(job ScheduledJob) {
 	}
 
 	// Update job's last run and calculate next run
+	// Re-read from file to pick up any changes made by the GUI while backup was running
 	jobs, _ := a.GetScheduledJobs()
 	for i, j := range jobs {
 		if j.ID == job.ID {
 			jobs[i].LastRun = time.Now().Format(time.RFC3339)
-			jobs[i].NextRun = calculateNextRun(job.ScheduleTime)
+			jobs[i].NextRun = calculateNextRun(j.ScheduleTime)
 			break
 		}
 	}
