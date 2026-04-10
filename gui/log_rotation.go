@@ -99,7 +99,7 @@ func (l *RotatingLogger) rotate() error {
 // rotatePosix uses rename (safe on Linux/Mac where open files can be renamed)
 func (l *RotatingLogger) rotatePosix(rotatedPath string) error {
 	// Close, rename, reopen
-	l.file.Close()
+	_ = l.file.Close()
 
 	if err := os.Rename(l.path, rotatedPath); err != nil {
 		// Reopen the original file to keep logging
@@ -127,7 +127,7 @@ func (l *RotatingLogger) rotatePosix(rotatedPath string) error {
 // This avoids Close→Rename→Open which breaks if Rename fails on Windows.
 func (l *RotatingLogger) rotateWindows(rotatedPath string) error {
 	// Sync before copying
-	l.file.Sync()
+	_ = l.file.Sync()
 
 	// Seek to beginning for copying
 	if _, err := l.file.Seek(0, 0); err != nil {
@@ -138,23 +138,23 @@ func (l *RotatingLogger) rotateWindows(rotatedPath string) error {
 	dst, err := os.Create(rotatedPath)
 	if err != nil {
 		// Seek back to end for continued writing
-		l.file.Seek(0, 2)
+		_, _ = l.file.Seek(0, 2)
 		return fmt.Errorf("failed to create rotated file: %w", err)
 	}
 
 	if _, err := io.Copy(dst, l.file); err != nil {
-		dst.Close()
-		os.Remove(rotatedPath)
-		l.file.Seek(0, 2)
+		_ = dst.Close()
+		_ = os.Remove(rotatedPath)
+		_, _ = l.file.Seek(0, 2)
 		return fmt.Errorf("failed to copy log content: %w", err)
 	}
-	dst.Close()
+	_ = dst.Close()
 
 	// Truncate the original file (keep the handle open)
 	if err := l.file.Truncate(0); err != nil {
 		return fmt.Errorf("failed to truncate log file: %w", err)
 	}
-	l.file.Seek(0, 0)
+	_, _ = l.file.Seek(0, 0)
 	l.currentSize = 0
 
 	// Start background compression
@@ -209,7 +209,7 @@ func compressLogFile(path string) error {
 	gzPath := path + ".gz"
 	dst, err := os.Create(gzPath)
 	if err != nil {
-		src.Close()
+		_ = src.Close()
 		return fmt.Errorf("failed to create compressed file: %w", err)
 	}
 
@@ -217,15 +217,15 @@ func compressLogFile(path string) error {
 
 	_, copyErr := io.Copy(gzWriter, src)
 	closeGzErr := gzWriter.Close()
-	dst.Close()
-	src.Close()
+	_ = dst.Close()
+	_ = src.Close()
 
 	if copyErr != nil {
-		os.Remove(gzPath)
+		_ = os.Remove(gzPath)
 		return fmt.Errorf("failed to compress: %w", copyErr)
 	}
 	if closeGzErr != nil {
-		os.Remove(gzPath)
+		_ = os.Remove(gzPath)
 		return fmt.Errorf("failed to close gzip writer: %w", closeGzErr)
 	}
 
