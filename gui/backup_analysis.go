@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,35 +11,23 @@ import (
 )
 
 const (
-	// SplitThreshold: If total backup size > 100GB, propose split
+	// SplitThreshold: If total backup size > 100GB, split into bins
 	SplitThreshold = 100 * 1024 * 1024 * 1024 // 100 GB
 
-	// MaxChunkSize: Each split job should be ~100GB max
-	// Was reduced to 50GB as workaround for manifest overflow, but the real cause
-	// was 8MB chunk avg producing oversized chunks. With 4MB avg (v0.2.50), 100GB
-	// jobs produce ~25k chunks = ~5MB manifest, well within PBS limits.
-	MaxChunkSize = 100 * 1024 * 1024 * 1024 // 100 GB
-
-	// MaxSubdivisions: Maximum number of sub-folders to create when subdividing
-	// If a folder has more sub-folders than this, don't subdivide (keep as single job)
-	MaxSubdivisions = 20
-
-	// MinSubfolderSize: Minimum size for a subfolder to justify subdivision (10GB)
-	// Don't subdivide if subfolders are too small (creates too many tiny jobs)
-	MinSubfolderSize = 10 * 1024 * 1024 * 1024 // 10 GB
+	// BinTargetSize: Target size per bin for bin-packing (~100GB)
+	BinTargetSize = 100 * 1024 * 1024 * 1024 // 100 GB
 )
 
 // GenerateBackupID creates a backup-id from hostname and path
 // Format: hostname_DRIVE_PATH (e.g., SERVER01_D_DATA_Users)
 func GenerateBackupID(hostname, path string) string {
-	// Clean path and replace backslashes with underscores
 	cleanPath := filepath.Clean(path)
 	cleanPath = strings.ReplaceAll(cleanPath, "\\", "_")
 	cleanPath = strings.ReplaceAll(cleanPath, "/", "_")
 	cleanPath = strings.ReplaceAll(cleanPath, ":", "")
 	cleanPath = strings.ReplaceAll(cleanPath, " ", "-")
 
-	// Remove any remaining characters not allowed by PBS backup-id format
+	// Remove any characters not allowed by PBS backup-id format
 	// PBS requires: ^[A-Za-z0-9_][A-Za-z0-9._\-]*$
 	var sanitized []byte
 	for _, c := range []byte(cleanPath) {
@@ -47,53 +37,64 @@ func GenerateBackupID(hostname, path string) string {
 	}
 	cleanPath = string(sanitized)
 
-	// Remove leading/trailing underscores
 	cleanPath = strings.Trim(cleanPath, "_")
 
-	// Combine hostname and path
 	if cleanPath == "" {
 		return hostname
 	}
 	return fmt.Sprintf("%s_%s", hostname, cleanPath)
 }
 
+// generateBinID creates a stable backup-id for a bin based on its folder paths.
+// Uses a short hash of the sorted paths so the same set of folders always
+// produces the same bin ID (important for PBS dedup across runs).
+func generateBinID(hostname string, parentPath string, folders []FolderInfo, binIndex int) string {
+	// Build a stable key from sorted folder names
+	names := make([]string, len(folders))
+	for i, f := range folders {
+		names[i] = f.Name
+	}
+	sort.Strings(names)
+
+	h := sha256.Sum256([]byte(strings.Join(names, "\n")))
+	shortHash := hex.EncodeToString(h[:4]) // 8 hex chars
+
+	parentID := GenerateBackupID(hostname, parentPath)
+	return fmt.Sprintf("%s_bin%d_%s", parentID, binIndex, shortHash)
+}
+
 // FolderInfo represents a top-level folder with its size
 type FolderInfo struct {
-	Path           string `json:"path"`
-	Name           string `json:"name"`
-	Size           uint64 `json:"size"`
-	AccessDenied   bool   `json:"access_denied"`   // True if size couldn't be calculated due to permissions
-	BackupExists   bool   `json:"backup_exists"`   // True if previous backup exists on PBS for this folder
-	BackupID       string `json:"backup_id"`       // Individual backup-id for this folder
+	Path         string `json:"path"`
+	Name         string `json:"name"`
+	Size         uint64 `json:"size"`
+	AccessDenied bool   `json:"access_denied"`
+	BackupID     string `json:"backup_id"`
 }
 
 // BackupAnalysis contains the analysis of directories to backup
 type BackupAnalysis struct {
-	TotalSize     uint64        `json:"total_size"`
-	Folders       []FolderInfo  `json:"folders"`
-	ShouldSplit   bool          `json:"should_split"`
-	SuggestedJobs int           `json:"suggested_jobs"`
+	TotalSize     uint64       `json:"total_size"`
+	Folders       []FolderInfo `json:"folders"`
+	ShouldSplit   bool         `json:"should_split"`
+	SuggestedJobs int          `json:"suggested_jobs"`
 }
 
 // AnalyzeBackupDirs analyzes the top-level folders in the backup directories
-// Returns total size and list of folders with their sizes
 func AnalyzeBackupDirs(backupDirs []string) (*BackupAnalysis, error) {
 	analysis := &BackupAnalysis{
 		Folders: make([]FolderInfo, 0),
 	}
 
 	for _, dir := range backupDirs {
-		// Check if directory exists
 		info, err := os.Stat(dir)
 		if err != nil {
 			return nil, fmt.Errorf("cannot access directory %s: %w", dir, err)
 		}
-
 		if !info.IsDir() {
 			return nil, fmt.Errorf("%s is not a directory", dir)
 		}
 
-		// List top-level folders
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return nil, fmt.Errorf("cannot read directory %s: %w", dir, err)
@@ -110,11 +111,9 @@ func AnalyzeBackupDirs(backupDirs []string) (*BackupAnalysis, error) {
 					Size: size,
 				}
 
-				// If access denied, mark folder and estimate large size (will be split separately)
 				if err != nil && strings.Contains(err.Error(), "access denied") {
 					folderInfo.AccessDenied = true
-					// Estimate 500GB for denied folders (will be in separate job with VSS)
-					folderInfo.Size = 500 * 1024 * 1024 * 1024
+					folderInfo.Size = 500 * 1024 * 1024 * 1024 // Estimate 500GB
 				}
 
 				analysis.Folders = append(analysis.Folders, folderInfo)
@@ -123,19 +122,17 @@ func AnalyzeBackupDirs(backupDirs []string) (*BackupAnalysis, error) {
 		}
 	}
 
-	// Sort folders by size (largest first) for better job distribution
+	// Sort folders by size (largest first) for better bin-packing
 	sort.Slice(analysis.Folders, func(i, j int) bool {
 		return analysis.Folders[i].Size > analysis.Folders[j].Size
 	})
 
-	// Determine if split is needed
 	analysis.ShouldSplit = analysis.TotalSize > SplitThreshold
 
-	// Calculate suggested number of jobs
 	if analysis.ShouldSplit {
-		analysis.SuggestedJobs = int((analysis.TotalSize + MaxChunkSize - 1) / MaxChunkSize)
-		if analysis.SuggestedJobs > 10 {
-			analysis.SuggestedJobs = 10 // Max 10 jobs
+		analysis.SuggestedJobs = int((analysis.TotalSize + BinTargetSize - 1) / BinTargetSize)
+		if analysis.SuggestedJobs < 2 {
+			analysis.SuggestedJobs = 2
 		}
 	} else {
 		analysis.SuggestedJobs = 1
@@ -144,59 +141,59 @@ func AnalyzeBackupDirs(backupDirs []string) (*BackupAnalysis, error) {
 	return analysis, nil
 }
 
-// SplitJob represents a partial backup job for a large backup
+// SplitJob represents a backup job (one or more folders grouped together)
 type SplitJob struct {
-	Index      int      `json:"index"`
-	TotalJobs  int      `json:"total_jobs"`
-	Folders    []string `json:"folders"`
-	TotalSize  uint64   `json:"total_size"`
-	BackupID   string   `json:"backup_id"`
-	ParentID   string   `json:"parent_id"` // Original job ID
+	Index     int      `json:"index"`
+	TotalJobs int      `json:"total_jobs"`
+	Folders   []string `json:"folders"`
+	TotalSize uint64   `json:"total_size"`
+	BackupID  string   `json:"backup_id"`
+	ParentID  string   `json:"parent_id"`
 }
 
-// getSubFolders returns direct sub-folders of a path with their sizes
-func getSubFolders(path string) ([]FolderInfo, error) {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
+// CreateSplitJobs groups folders into bins of ~BinTargetSize using first-fit decreasing.
+//
+// Strategy:
+//   - Folders > BinTargetSize get their own job (solo bin)
+//   - Remaining folders are packed into bins of ~BinTargetSize
+//   - Folders sorted largest-first for better packing
+//   - Bin IDs are stable (hash of folder names) for PBS dedup across runs
+func CreateSplitJobs(analysis *BackupAnalysis, baseBackupID string, hostname string) []SplitJob {
+	if !analysis.ShouldSplit {
+		allFolders := make([]string, len(analysis.Folders))
+		for i, f := range analysis.Folders {
+			allFolders[i] = f.Path
+		}
+		return []SplitJob{{
+			Index:     1,
+			TotalJobs: 1,
+			Folders:   allFolders,
+			TotalSize: analysis.TotalSize,
+			BackupID:  baseBackupID,
+			ParentID:  baseBackupID,
+		}}
 	}
 
-	subFolders := make([]FolderInfo, 0)
-	for _, entry := range entries {
-		if entry.IsDir() {
-			subPath := filepath.Join(path, entry.Name())
-			size, err := calculateDirSize(subPath)
+	// Determine parent path for bin ID generation
+	parentPath := ""
+	if len(analysis.Folders) > 0 {
+		parentPath = filepath.Dir(analysis.Folders[0].Path)
+	}
 
-			subFolder := FolderInfo{
-				Path: subPath,
-				Name: entry.Name(),
-				Size: size,
-			}
+	// Separate large folders (solo bins) from packable folders
+	var soloFolders []FolderInfo
+	var packable []FolderInfo
 
-			// If access denied, mark it but don't skip
-			if err != nil && strings.Contains(err.Error(), "access denied") {
-				subFolder.AccessDenied = true
-				subFolder.Size = 10 * 1024 * 1024 * 1024 // Estimate 10GB
-			}
-
-			subFolders = append(subFolders, subFolder)
+	for _, folder := range analysis.Folders {
+		if folder.Size > BinTargetSize || folder.AccessDenied {
+			soloFolders = append(soloFolders, folder)
+		} else {
+			packable = append(packable, folder)
 		}
 	}
 
-	// Sort by size (largest first)
-	sort.Slice(subFolders, func(i, j int) bool {
-		return subFolders[i].Size > subFolders[j].Size
-	})
-
-	return subFolders, nil
-}
-
-// CreateSplitJobs creates multiple smaller jobs from a large backup
-// Uses bin-packing algorithm to distribute folders evenly
-// Folders with AccessDenied are placed in separate jobs (will use VSS)
-func CreateSplitJobs(analysis *BackupAnalysis, baseBackupID string, hostname string) []SplitJob {
-	if !analysis.ShouldSplit {
-		// No split needed, return single job
+	// If nothing to do, return single job with all folders
+	if len(soloFolders) == 0 && len(packable) == 0 {
 		allFolders := make([]string, len(analysis.Folders))
 		for i, f := range analysis.Folders {
 			allFolders[i] = f.Path
@@ -213,80 +210,8 @@ func CreateSplitJobs(analysis *BackupAnalysis, baseBackupID string, hostname str
 
 	jobs := make([]SplitJob, 0)
 
-	// Separate folders: accessible vs denied, and filter out already backed-up folders
-	accessibleFolders := make([]FolderInfo, 0)
-	deniedFolders := make([]FolderInfo, 0)
-
-	for _, folder := range analysis.Folders {
-		// Skip folders that already have backups (dedup will handle them efficiently)
-		if folder.BackupExists {
-			continue
-		}
-
-		if folder.AccessDenied {
-			deniedFolders = append(deniedFolders, folder)
-		} else {
-			accessibleFolders = append(accessibleFolders, folder)
-		}
-	}
-
-	// If no folders need splitting (all backed up or too small), return empty
-	if len(accessibleFolders) == 0 && len(deniedFolders) == 0 {
-		// All folders already backed up - return single job with all folders
-		allFolders := make([]string, len(analysis.Folders))
-		for i, f := range analysis.Folders {
-			allFolders[i] = f.Path
-		}
-		return []SplitJob{{
-			Index:     1,
-			TotalJobs: 1,
-			Folders:   allFolders,
-			TotalSize: analysis.TotalSize,
-			BackupID:  baseBackupID,
-			ParentID:  baseBackupID,
-		}}
-	}
-
-	// Create one job per top-level folder (both denied and accessible)
-	// If a folder > MaxChunkSize, subdivide it into sub-folders
-	allFolders := append(deniedFolders, accessibleFolders...)
-
-	for _, folder := range allFolders {
-		// If folder is too large, try to subdivide into direct sub-folders
-		if folder.Size > MaxChunkSize && !folder.AccessDenied {
-			subFolders, err := getSubFolders(folder.Path)
-
-			// Only subdivide if:
-			// 1. No error getting subfolders
-			// 2. Between 2 and MaxSubdivisions subfolders (not too many)
-			// 3. At least one subfolder is large enough to justify split
-			if err == nil && len(subFolders) >= 2 && len(subFolders) <= MaxSubdivisions {
-				hasLargeSubfolder := false
-				for _, sf := range subFolders {
-					if sf.Size >= MinSubfolderSize {
-						hasLargeSubfolder = true
-						break
-					}
-				}
-
-				if hasLargeSubfolder {
-					// Subdivide: create one job per sub-folder
-					for _, subFolder := range subFolders {
-						backupID := GenerateBackupID(hostname, subFolder.Path)
-						jobs = append(jobs, SplitJob{
-							Folders:   []string{subFolder.Path},
-							TotalSize: subFolder.Size,
-							BackupID:  backupID, // e.g., JDS-SRV-1_D_DATA_app
-							ParentID:  baseBackupID,
-						})
-					}
-					continue
-				}
-			}
-			// If subdivision not suitable (too many subfolders, too small, or error), fall through to single job
-		}
-
-		// Single job for this folder
+	// Solo bins: one job per large/denied folder
+	for _, folder := range soloFolders {
 		backupID := folder.BackupID
 		if backupID == "" {
 			backupID = GenerateBackupID(hostname, folder.Path)
@@ -294,19 +219,81 @@ func CreateSplitJobs(analysis *BackupAnalysis, baseBackupID string, hostname str
 		jobs = append(jobs, SplitJob{
 			Folders:   []string{folder.Path},
 			TotalSize: folder.Size,
-			BackupID:  backupID, // e.g., JDS-SRV-1_D_DATA, JDS-SRV-1_E_USERS
+			BackupID:  backupID,
+			ParentID:  baseBackupID,
+		})
+	}
+
+	// Bin-pack remaining folders (first-fit decreasing, already sorted largest first)
+	bins := binPackFolders(packable, BinTargetSize)
+
+	for i, bin := range bins {
+		folders := make([]string, len(bin))
+		var totalSize uint64
+		for j, f := range bin {
+			folders[j] = f.Path
+			totalSize += f.Size
+		}
+
+		binID := generateBinID(hostname, parentPath, bin, i+1)
+
+		jobs = append(jobs, SplitJob{
+			Folders:   folders,
+			TotalSize: totalSize,
+			BackupID:  binID,
 			ParentID:  baseBackupID,
 		})
 	}
 
 	// Set indices
-	totalJobs := len(jobs)
 	for i := range jobs {
 		jobs[i].Index = i + 1
-		jobs[i].TotalJobs = totalJobs
+		jobs[i].TotalJobs = len(jobs)
 	}
 
 	return jobs
+}
+
+// binPackFolders groups folders into bins using first-fit decreasing.
+// Folders must be pre-sorted by size (largest first).
+func binPackFolders(folders []FolderInfo, targetSize uint64) [][]FolderInfo {
+	if len(folders) == 0 {
+		return nil
+	}
+
+	type bin struct {
+		folders []FolderInfo
+		used    uint64
+	}
+
+	var bins []bin
+
+	for _, folder := range folders {
+		// Find first bin that can fit this folder
+		placed := false
+		for i := range bins {
+			if bins[i].used+folder.Size <= targetSize {
+				bins[i].folders = append(bins[i].folders, folder)
+				bins[i].used += folder.Size
+				placed = true
+				break
+			}
+		}
+
+		if !placed {
+			// Create new bin
+			bins = append(bins, bin{
+				folders: []FolderInfo{folder},
+				used:    folder.Size,
+			})
+		}
+	}
+
+	result := make([][]FolderInfo, len(bins))
+	for i, b := range bins {
+		result[i] = b.folders
+	}
+	return result
 }
 
 // FormatSize formats a size in bytes to human-readable format

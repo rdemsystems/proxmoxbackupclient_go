@@ -415,58 +415,7 @@ func RunBackupInline(opts BackupOptions) (returnErr error) {
 		}
 
 		if analysis.ShouldSplit {
-			// Check each folder individually for existing backups
-			compressionLevel := pbscommon.ParseCompressionLevel(opts.Compression)
-			tempClient := &pbscommon.PBSClient{
-				BaseURL:          opts.BaseURL,
-				CertFingerPrint:  opts.CertFingerprint,
-				AuthID:           opts.AuthID,
-				Secret:           opts.Secret,
-				Datastore:        opts.Datastore,
-				Namespace:        opts.Namespace,
-				Insecure:         opts.CertFingerprint != "",
-				CompressionLevel: compressionLevel,
-			}
-
-			allFoldersBackedUp := true
-			for i := range analysis.Folders {
-				folderBackupID := GenerateBackupID(hostname, analysis.Folders[i].Path)
-				analysis.Folders[i].BackupID = folderBackupID
-
-				// Check if this specific folder has a previous backup using REST API
-				// DON'T use Connect() here - it creates a backup session that needs Finish()
-				snapshots, err := tempClient.ListSnapshots()
-				backupExists := false
-
-				if err == nil {
-					// Check if any snapshot matches this BackupID
-					for _, snap := range snapshots {
-						if snap.BackupID == folderBackupID {
-							backupExists = true
-							break
-						}
-					}
-				}
-
-				analysis.Folders[i].BackupExists = backupExists
-				if backupExists {
-					writeBackupLog(fmt.Sprintf("[Auto-Split] Folder %s: Previous backup found (skip splitting)", folderBackupID))
-				} else {
-					allFoldersBackedUp = false
-					writeBackupLog(fmt.Sprintf("[Auto-Split] Folder %s: First backup (will split if large)", folderBackupID))
-				}
-			}
-
-			// If ALL folders already have backups, disable split entirely (dedup will optimize)
-			if allFoldersBackedUp {
-				writeBackupLog("[Auto-Split] All folders already backed up - SKIPPING split (deduplication will optimize size)")
-				analysis.ShouldSplit = false
-			}
-		}
-
-		if analysis.ShouldSplit {
-
-			// Create split jobs
+			// Create split jobs using bin-packing (groups small folders into ~100GB bins)
 			splitJobs := CreateSplitJobs(analysis, baseBackupID, hostname)
 			writeBackupLog(fmt.Sprintf("[Auto-Split] Splitting into %d jobs", len(splitJobs)))
 
