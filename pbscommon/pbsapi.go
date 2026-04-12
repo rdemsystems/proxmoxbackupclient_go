@@ -632,6 +632,10 @@ func (pbs *PBSClient) TestConnection() error {
 func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 	pbs.WritersManifest = make(map[uint64]int)
 	pbs.SkippedFiles = []string{} // Reset skipped files for new backup
+	// CRITICAL: Reset Manifest.Files for each new session. Otherwise files from
+	// previous Connect() calls leak into the next session's manifest, causing PBS
+	// to reject the manifest (files reference UUIDs from abandoned sessions).
+	pbs.Manifest.Files = nil
 	pbs.TLSConfig = tls.Config{
 		InsecureSkipVerify: pbs.Insecure,
 	}

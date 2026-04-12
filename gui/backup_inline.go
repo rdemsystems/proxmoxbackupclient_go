@@ -572,35 +572,43 @@ func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
 	var reusechunk atomic.Uint64
 	var failedchunk atomic.Uint64
 	var totalSize atomic.Uint64
+	var dirErrors []string
+	successfulDirs := 0
 
 	for idx, dir := range opts.BackupDirs {
-		// Log directory start but don't call progress() to avoid interfering with ChunkState progress
 		writeBackupLog(fmt.Sprintf("Starting backup of directory %d/%d: %s", idx+1, len(opts.BackupDirs), dir))
 
+		// Each directory becomes its own PBS session (Connect → upload → Finish).
+		// This ensures each dir is independently committed even if others fail.
 		err := backupDirectory(client, &newchunk, &reusechunk, &failedchunk, dir, opts.UseVSS, progress)
 		if err != nil {
 			errMsg := fmt.Sprintf("Backup failed for %s: %v", dir, err)
 			writeBackupLog(errMsg)
-			if opts.OnComplete != nil {
-				opts.OnComplete(false, errMsg)
-			}
-			return fmt.Errorf("%s", errMsg)
+			dirErrors = append(dirErrors, errMsg)
+			continue // Don't abort — try remaining directories
 		}
+
+		// Finalize this directory's PBS session immediately so it's committed on the server
+		finishCfg := retry.DefaultConfig()
+		finishCfg.MaxAttempts = 5
+		finishCtx, finishCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		finishErr := retry.DoWithJitter(finishCtx, finishCfg, retry.DefaultRetryable, func() error {
+			return client.Finish()
+		})
+		finishCancel()
+		if finishErr != nil {
+			errMsg := fmt.Sprintf("Failed to finalize backup for %s: %v", dir, finishErr)
+			writeBackupLog(errMsg)
+			dirErrors = append(dirErrors, errMsg)
+			continue
+		}
+		writeBackupLog(fmt.Sprintf("Directory %d/%d finalized: %s", idx+1, len(opts.BackupDirs), dir))
+		successfulDirs++
 	}
 
-	progress(0.95, "Finalizing backup...")
-
-	// Finalize backup with retry
-	retryConfig := retry.DefaultConfig()
-	retryConfig.MaxAttempts = 5
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	err := retry.DoWithJitter(ctx, retryConfig, retry.DefaultRetryable, func() error {
-		return client.Finish()
-	})
-	if err != nil {
-		errMsg := fmt.Sprintf("Failed to finalize backup after retries: %v", err)
+	// If NO directory was backed up successfully, fail the whole backup
+	if successfulDirs == 0 {
+		errMsg := fmt.Sprintf("All %d directories failed:\n%s", len(opts.BackupDirs), strings.Join(dirErrors, "\n"))
 		writeBackupLog(errMsg)
 		if opts.OnComplete != nil {
 			opts.OnComplete(false, errMsg)
@@ -616,11 +624,16 @@ func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
 
 	// Build completion message with duration, size, and chunk stats
 	failed := failedchunk.Load()
+	partial := len(dirErrors) > 0
 	var completionMsg string
-	if failed > 0 {
+	switch {
+	case partial:
+		completionMsg = fmt.Sprintf("⚠️  Backup partiel en %s: %d/%d dossiers OK, %.1f MB (%d new, %d reused chunks)\nErreurs:\n%s",
+			formatDuration(duration), successfulDirs, len(opts.BackupDirs), totalSizeMB, newchunk.Load(), reusechunk.Load(), strings.Join(dirErrors, "\n"))
+	case failed > 0:
 		completionMsg = fmt.Sprintf("⚠️  Backup completed with errors in %s: %.1f MB backed up (%d new, %d reused, %d FAILED chunks)",
 			formatDuration(duration), totalSizeMB, newchunk.Load(), reusechunk.Load(), failed)
-	} else {
+	default:
 		completionMsg = fmt.Sprintf("Backup completed in %s: %.1f MB backed up (%d new, %d reused chunks)",
 			formatDuration(duration), totalSizeMB, newchunk.Load(), reusechunk.Load())
 	}
