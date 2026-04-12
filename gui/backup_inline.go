@@ -42,6 +42,21 @@ type BackupOptions struct {
 
 var didxMagic = []byte{28, 145, 78, 165, 25, 186, 179, 205}
 
+// isFatalSessionError returns true for errors that make the current PBS session
+// unusable. These indicate the H2 connection was lost; the session state on the
+// server is gone, and all subsequent operations on this session will fail.
+// The only recovery is a fresh Connect() with a new backup-time.
+func isFatalSessionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "PBS session cannot be resumed") ||
+		strings.Contains(s, "connection lost") ||
+		strings.Contains(s, "unexpected EOF") ||
+		strings.Contains(s, "writer '") && strings.Contains(s, "not registered")
+}
+
 // Global backup locks per destination (BaseURL + Datastore)
 var (
 	backupLocks      = make(map[string]*sync.Mutex)
@@ -173,7 +188,6 @@ func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) error {
 					return client.UploadDynamicCompressedChunk(c.wrid, shahash, chunkData)
 				})
 				if err != nil {
-					// Log error but CONTINUE processing
 					errMsg := fmt.Sprintf("⚠️  Failed to upload chunk %s after %d retries: %v", shahash, retryConfig.MaxAttempts, err)
 					writeBackupLog(errMsg)
 					c.failedchunk.Add(1)
@@ -183,7 +197,12 @@ func (c *ChunkState) HandleData(b []byte, client *pbscommon.PBSClient) error {
 					c.uploadErrors = append(c.uploadErrors, errMsg)
 					c.errorsMutex.Unlock()
 
-					// Continue with next chunk instead of failing
+					// FATAL errors: session is dead, all subsequent uploads will fail too.
+					// Abort this directory immediately instead of wasting time on chunks that cannot upload.
+					if isFatalSessionError(err) {
+						return fmt.Errorf("session lost mid-backup: %w", err)
+					}
+					// Non-fatal errors: continue with next chunk
 				} else {
 					c.newchunk.Add(1)
 				}
@@ -291,15 +310,17 @@ func (c *ChunkState) Eof(client *pbscommon.PBSClient) error {
 				return client.UploadDynamicCompressedChunk(c.wrid, shahash, chunkData)
 			})
 			if err != nil {
-				// Log error but CONTINUE processing
 				errMsg := fmt.Sprintf("⚠️  Failed to upload final chunk %s after %d retries: %v", shahash, retryConfig.MaxAttempts, err)
 				writeBackupLog(errMsg)
 				c.failedchunk.Add(1)
 
-				// Collect error for final report
 				c.errorsMutex.Lock()
 				c.uploadErrors = append(c.uploadErrors, errMsg)
 				c.errorsMutex.Unlock()
+
+				if isFatalSessionError(err) {
+					return fmt.Errorf("session lost mid-backup (final chunk): %w", err)
+				}
 			} else {
 				c.newchunk.Add(1)
 			}
@@ -575,12 +596,30 @@ func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
 	var dirErrors []string
 	successfulDirs := 0
 
+	const maxDirAttempts = 3
+
 	for idx, dir := range opts.BackupDirs {
 		writeBackupLog(fmt.Sprintf("Starting backup of directory %d/%d: %s", idx+1, len(opts.BackupDirs), dir))
 
 		// Each directory becomes its own PBS session (Connect → upload → Finish).
-		// This ensures each dir is independently committed even if others fail.
-		err := backupDirectory(client, &newchunk, &reusechunk, &failedchunk, dir, opts.UseVSS, progress)
+		// Retry the whole directory from scratch on session-lost errors (H2 connection drops).
+		// PBS dedupes chunks, so retrying is cheap for the already-uploaded data.
+		var err error
+		for attempt := 1; attempt <= maxDirAttempts; attempt++ {
+			err = backupDirectory(client, &newchunk, &reusechunk, &failedchunk, dir, opts.UseVSS, progress)
+			if err == nil {
+				break
+			}
+			if !isFatalSessionError(err) {
+				// Non-recoverable error (e.g. access denied) — don't retry
+				break
+			}
+			if attempt < maxDirAttempts {
+				writeBackupLog(fmt.Sprintf("Directory %s: session lost on attempt %d/%d, retrying with fresh connection: %v",
+					dir, attempt, maxDirAttempts, err))
+			}
+		}
+
 		if err != nil {
 			errMsg := fmt.Sprintf("Backup failed for %s: %v", dir, err)
 			writeBackupLog(errMsg)

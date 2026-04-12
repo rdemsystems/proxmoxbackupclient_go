@@ -692,9 +692,15 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 	// fail rather than silently create a new PBS session with stale writer IDs.
 	var dialCalled atomic.Bool
 
-	// Create completely new client with fresh HTTP/2 transport
+	// Create completely new client with fresh HTTP/2 transport.
+	// ReadIdleTimeout + PingTimeout cause the transport to send PING frames on idle
+	// connections and detect dead connections quickly. Without this, a silently
+	// dropped connection (firewall, NAT timeout, etc.) only manifests when the
+	// next chunk upload fails, wasting minutes of backup time.
 	pbs.Client = http.Client{
 		Transport: &http2.Transport{
+			ReadIdleTimeout: 30 * time.Second,
+			PingTimeout:     15 * time.Second,
 
 			DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
 
