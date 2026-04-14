@@ -615,13 +615,18 @@ func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
 	var dirErrors []string
 	successfulDirs := 0
 
-	const maxDirAttempts = 3
+	// Retry policy for session-lost failures: PBS keeps the BackupGroup lock until
+	// it detects the dead TCP connection server-side (observed ~16 min in prod).
+	// Any retry sooner than that hits 400 "while creating locked backup group".
+	// We wait sessionLostRetryWait between attempts so the lock has time to expire.
+	const maxDirAttempts = 2
+	const sessionLostRetryWait = 25 * time.Minute
 
 	for idx, dir := range opts.BackupDirs {
 		writeBackupLog(fmt.Sprintf("Starting backup of directory %d/%d: %s", idx+1, len(opts.BackupDirs), dir))
 
 		// Each directory becomes its own PBS session (Connect → upload → Finish).
-		// Retry the whole directory from scratch on session-lost errors (H2 connection drops).
+		// On session-lost we wait for PBS to release the group lock, then retry once.
 		// PBS dedupes chunks, so retrying is cheap for the already-uploaded data.
 		var err error
 		for attempt := 1; attempt <= maxDirAttempts; attempt++ {
@@ -634,8 +639,26 @@ func runBackupInlineInternal(opts BackupOptions) (returnErr error) {
 				break
 			}
 			if attempt < maxDirAttempts {
-				writeBackupLog(fmt.Sprintf("Directory %s: session lost on attempt %d/%d, retrying with fresh connection: %v",
+				writeBackupLog(fmt.Sprintf("Directory %s: session lost on attempt %d/%d: %v",
 					dir, attempt, maxDirAttempts, err))
+				writeBackupLog(fmt.Sprintf("Waiting %s for PBS to release backup group lock before retry...",
+					sessionLostRetryWait))
+
+				waitUntil := time.Now().Add(sessionLostRetryWait)
+				for {
+					remaining := time.Until(waitUntil)
+					if remaining <= 0 {
+						break
+					}
+					progress(0, fmt.Sprintf("Session PBS perdue, attente %s avant retry (lock PBS en cours de libération)...",
+						remaining.Round(time.Second)))
+					sleepFor := 30 * time.Second
+					if remaining < sleepFor {
+						sleepFor = remaining
+					}
+					time.Sleep(sleepFor)
+				}
+				writeBackupLog(fmt.Sprintf("Wait complete, retrying directory %s with fresh connection", dir))
 			}
 		}
 
