@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -217,6 +218,11 @@ func compressLogFile(path string) error {
 
 	_, copyErr := io.Copy(gzWriter, src)
 	closeGzErr := gzWriter.Close()
+	// Force the gzip footer + compressed body to disk before we delete
+	// the source. Without this a hard crash here leaves a .gz with no
+	// footer (decodes as "unexpected end of file") and no source to
+	// recover from.
+	syncErr := dst.Sync()
 	_ = dst.Close()
 	_ = src.Close()
 
@@ -227,6 +233,10 @@ func compressLogFile(path string) error {
 	if closeGzErr != nil {
 		_ = os.Remove(gzPath)
 		return fmt.Errorf("failed to close gzip writer: %w", closeGzErr)
+	}
+	if syncErr != nil {
+		_ = os.Remove(gzPath)
+		return fmt.Errorf("failed to fsync compressed log: %w", syncErr)
 	}
 
 	// Remove original - on Windows this can fail, retry once after a short delay
@@ -262,6 +272,44 @@ func sanitizeForFilename(s string) string {
 		return "unnamed"
 	}
 	return string(b)
+}
+
+// perRunLogRe matches a per-run uncompressed log file left behind when the
+// process died before EndBackupRunLog's compression ran to completion.
+var perRunLogRe = regexp.MustCompile(`^backup-\d{8}-\d{6}-.+\.log$`)
+
+// rotatedLeftoverRe matches an intermediate rotation file whose compression
+// goroutine was killed before it finished.
+var rotatedLeftoverRe = regexp.MustCompile(`\.log\.\d{8}-\d{6}$`)
+
+// RecoverOrphanLogs gzips any uncompressed per-run log or intermediate
+// rotation file found in dir. Intended to run at service startup, before
+// any backup has had a chance to begin. It is safe to call when no orphans
+// exist (no-op) and cheap: the scan is bounded by the rotation cap.
+//
+// Rationale: EndBackupRunLog and rotateWindows both hand off compression
+// to a goroutine. If the service is killed (reboot, task-scheduler kill,
+// crash) between "compression started" and "gzip footer flushed", the .gz
+// on disk is truncated. Leaving a full .log alongside a partial .gz lets
+// us recover here on the next start.
+func RecoverOrphanLogs(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !perRunLogRe.MatchString(name) && !rotatedLeftoverRe.MatchString(name) {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		if err := compressLogFile(path); err != nil {
+			fmt.Fprintf(os.Stderr, "orphan log recovery failed for %s: %v\n", name, err)
+		}
+	}
 }
 
 // cleanupOldLogs removes old rotated log files, keeping only maxFiles

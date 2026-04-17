@@ -56,6 +56,10 @@ func init() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create service logger: %v\n", err)
 	}
+
+	// Compress any per-run or rotated log files left behind by a previous
+	// crash/kill so operators get a full, inspectable .gz.
+	RecoverOrphanLogs(logDir)
 }
 
 // GetServiceLogPath returns the path to the service log file
@@ -105,11 +109,13 @@ func EndBackupRunLog(logger *RotatingLogger) {
 	path := logger.path
 	_ = logger.Close()
 
-	go func() {
-		if err := compressLogFile(path); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to compress backup run log %s: %v\n", path, err)
-		}
-	}()
+	// Synchronous compression: after a multi-hour backup, an extra second
+	// to flush a gzip footer is acceptable, and it guarantees that a
+	// service stop/kill right after EndBackupRunLog returns can't leave a
+	// truncated .log.gz on disk.
+	if err := compressLogFile(path); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to compress backup run log %s: %v\n", path, err)
+	}
 }
 
 // writeDebugLog writes to service log (scheduler, general operations)
