@@ -166,14 +166,32 @@ jobs:
         working-directory: gui/frontend
         run: npm install
 
-      - name: Extract version from wails.json
+      - name: Determine version
         id: version
-        working-directory: gui
-        run: |
-          $version = (Get-Content wails.json | ConvertFrom-Json).info.productVersion
-          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
-          echo "Building version: $version"
         shell: pwsh
+        run: |
+          # When the build is triggered by a tag push (v*), the tag is
+          # the source of truth. For branch pushes / PRs we fall back to
+          # wails.json + short SHA so dev builds get a sensible,
+          # non-overlapping version string.
+          #
+          # VERSION feeds main.appVersion via ldflags (displayed in the
+          # GUI, logged in each run banner). VERSION_MSI feeds the WiX
+          # ProductVersion, which must be a strict x.y.z numeric tuple
+          # — so on branch builds we strip the -dev-<sha> suffix for
+          # the MSI but keep it on the binary.
+          $base = (Get-Content gui/wails.json | ConvertFrom-Json).info.productVersion
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" -replace "^v", ""
+            $version_msi = $version
+          } else {
+            $shortSha = "${{ github.sha }}".Substring(0, 7)
+            $version = "$base-dev-$shortSha"
+            $version_msi = $base
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "VERSION_MSI=$version_msi" >> $env:GITHUB_OUTPUT
+          echo "Building version: $version (MSI: $version_msi)"
 
       - name: Build GUI
         working-directory: gui
@@ -206,7 +224,9 @@ jobs:
       - name: Build MSI Installer
         working-directory: installer/wix
         run: |
-          candle.exe Product.wxs -ext WixUIExtension -ext WixUtilExtension
+          # Pass the resolved version to the WiX preprocessor so MSI
+          # metadata matches the tag / ldflags version.
+          candle.exe "-dProductVersion=${{ steps.version.outputs.VERSION_MSI }}" Product.wxs -ext WixUIExtension -ext WixUtilExtension
           light.exe Product.wixobj -ext WixUIExtension -ext WixUtilExtension -out NimbusBackup.msi
           Copy-Item NimbusBackup.msi ../../dist/
         shell: pwsh
