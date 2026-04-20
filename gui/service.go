@@ -11,6 +11,7 @@ import (
 
 	"github.com/kardianos/service"
 	"github.com/tizbac/proxmoxbackupclient_go/gui/api"
+	"pbscommon"
 )
 
 // NimbusService wraps the application for Windows Service execution
@@ -82,6 +83,11 @@ func (s *NimbusService) run() {
 // Stop is called when the service stops
 func (s *NimbusService) Stop(svc service.Service) error {
 	writeDebugLog("NimbusBackup service stopping...")
+
+	// Close any live PBS backup session before we return, so the server
+	// releases the writer / snapshot lock instead of waiting for TCP
+	// keepalive to reap the abandoned connection.
+	pbscommon.CloseAllActive()
 
 	// Signal the main loop to exit
 	if s.stopChan != nil {

@@ -18,6 +18,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -134,6 +135,49 @@ type PBSClient struct {
 	WritersManifest  map[uint64]int
 	SkippedFiles     []string         // Track files/dirs skipped during backup
 	CompressionLevel CompressionLevel // Zstd compression level (default: fastest)
+
+	// activeConn is the raw TLS socket underlying the HTTP/2 transport for
+	// this backup session. Close() uses it to force-terminate the connection
+	// so PBS releases the writer / snapshot lock immediately, without waiting
+	// on OS TCP keepalive (10+ min) — http2.Transport.CloseIdleConnections()
+	// alone is a no-op while streams are open.
+	activeConn   net.Conn
+	activeConnMu sync.Mutex
+}
+
+// activeClients tracks every PBSClient currently holding an open HTTP/2
+// session. A signal handler or Wails shutdown hook calls CloseAllActive
+// to release writers before the process exits; otherwise the PBS-side
+// snapshot lock lingers and blocks the next verify run on that group.
+var (
+	activeClientsMu sync.Mutex
+	activeClients   = map[*PBSClient]struct{}{}
+)
+
+func registerActive(c *PBSClient) {
+	activeClientsMu.Lock()
+	activeClients[c] = struct{}{}
+	activeClientsMu.Unlock()
+}
+
+func unregisterActive(c *PBSClient) {
+	activeClientsMu.Lock()
+	delete(activeClients, c)
+	activeClientsMu.Unlock()
+}
+
+// CloseAllActive force-closes every live PBS backup session. Safe to
+// call from a signal handler.
+func CloseAllActive() {
+	activeClientsMu.Lock()
+	clients := make([]*PBSClient, 0, len(activeClients))
+	for c := range activeClients {
+		clients = append(clients, c)
+	}
+	activeClientsMu.Unlock()
+	for _, c := range clients {
+		c.Close()
+	}
 }
 
 const PBS_FIXED_CHUNK_SIZE = 4 * 1024 * 1024
@@ -598,6 +642,10 @@ func (pbs *PBSClient) Finish() error {
 		return fmt.Errorf("PBS finish failed: HTTP %d - %s", resp2.StatusCode, string(bodyBytes))
 	}
 
+	// Session committed; drop from the active-session registry so the
+	// shutdown hook doesn't try to Close() a writer that no longer needs it.
+	unregisterActive(pbs)
+
 	return nil
 }
 
@@ -740,6 +788,11 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 				if err != nil {
 					return nil, err
 				}
+				// Stash the raw socket so Close() can force-terminate the
+				// session on shutdown even while an H2 stream is in flight.
+				pbs.activeConnMu.Lock()
+				pbs.activeConn = conn
+				pbs.activeConnMu.Unlock()
 				q := &url.Values{}
 				q.Add("backup-time", fmt.Sprintf("%d", pbs.Manifest.BackupTime))
 				q.Add("backup-type", pbs.Manifest.BackupType)
@@ -839,6 +892,30 @@ func (pbs *PBSClient) Connect(reader bool, backuptype string) {
 		},
 	}
 
+	registerActive(pbs)
+}
+
+// Close force-terminates the HTTP/2 session so PBS releases the backup
+// writer and its shared snapshot lock without waiting on TCP keepalive.
+// Safe to call multiple times and before Connect.
+func (pbs *PBSClient) Close() {
+	unregisterActive(pbs)
+
+	pbs.activeConnMu.Lock()
+	conn := pbs.activeConn
+	pbs.activeConn = nil
+	pbs.activeConnMu.Unlock()
+	if conn != nil {
+		_ = conn.Close()
+	}
+
+	if pbs.Client.Transport != nil {
+		if h2, ok := pbs.Client.Transport.(*http2.Transport); ok {
+			h2.CloseIdleConnections()
+		} else {
+			pbs.Client.CloseIdleConnections()
+		}
+	}
 }
 
 type FIDXHeader struct {

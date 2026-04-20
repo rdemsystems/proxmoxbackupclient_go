@@ -9,8 +9,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -82,6 +84,20 @@ func main() {
 	writeDebugLog(fmt.Sprintf("Service log: %s", GetServiceLogPath()))
 	writeDebugLog(fmt.Sprintf("Backup log: %s", GetBackupLogPath()))
 	writeDebugLog(fmt.Sprintf("Crash report path: %s", crashReportPath))
+
+	// Install SIGINT/SIGTERM handler so any live PBS backup session gets
+	// closed before we exit. Without this, a forced kill (e.g. "update
+	// and restart") leaves the HTTP/2 connection dangling — PBS keeps
+	// the snapshot lock until TCP keepalive reaps it ~16 min later,
+	// which blocks the next verify run on that group.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		writeDebugLog(fmt.Sprintf("Signal %v received — closing active PBS sessions", sig))
+		pbscommon.CloseAllActive()
+		os.Exit(1)
+	}()
 
 	// Clean up legacy auto-start from previous versions
 	// (Task Scheduler or Registry entries before MSI service)
@@ -232,7 +248,8 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
-	writeDebugLog("App.shutdown() called")
+	writeDebugLog("App.shutdown() called — closing active PBS sessions")
+	pbscommon.CloseAllActive()
 }
 
 // GetConfig returns the current configuration
