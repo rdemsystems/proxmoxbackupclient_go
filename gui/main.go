@@ -620,8 +620,11 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 	// Note: Admin check for VSS is done in StartBackup() routing layer
 	// If we're here via service, we're already running as LocalSystem
 
+	// Resolve PBS fields from multi-PBS default when legacy fields are empty
+	pbsCfg := a.config.EffectivePBS()
+
 	// Validate PBS config
-	if err := a.config.Validate(); err != nil {
+	if err := pbsCfg.Validate(); err != nil {
 		return err
 	}
 
@@ -643,12 +646,12 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 
 	// Prepare backup options
 	opts := BackupOptions{
-		BaseURL:         a.config.BaseURL,
-		AuthID:          a.config.AuthID,
-		Secret:          a.config.Secret,
-		Datastore:       a.config.Datastore,
-		Namespace:       a.config.Namespace,
-		CertFingerprint: a.config.CertFingerprint,
+		BaseURL:         pbsCfg.BaseURL,
+		AuthID:          pbsCfg.AuthID,
+		Secret:          pbsCfg.Secret,
+		Datastore:       pbsCfg.Datastore,
+		Namespace:       pbsCfg.Namespace,
+		CertFingerprint: pbsCfg.CertFingerprint,
 		BackupDirs:      targetDirs,
 		BackupID:        backupID,
 		BackupType:      "host", // "host" for directory, would be "vm" for machine
@@ -774,13 +777,16 @@ func (a *App) startBackupDirect(backupType string, backupDirs []string, driveLet
 func (a *App) ListSnapshots(backupID string) ([]map[string]string, error) {
 	writeDebugLog(fmt.Sprintf("ListSnapshots() called: backupID=%s", backupID))
 
+	// Resolve PBS fields from multi-PBS default when legacy fields are empty
+	pbsCfg := a.config.EffectivePBS()
+
 	// Validate config
-	if err := a.config.Validate(); err != nil {
+	if err := pbsCfg.Validate(); err != nil {
 		return nil, err
 	}
 
 	// Create restore manager
-	rm := NewRestoreManager(a.config)
+	rm := NewRestoreManager(pbsCfg)
 
 	// List snapshots
 	snapshots, err := rm.ListSnapshots()
@@ -812,8 +818,11 @@ func (a *App) ListSnapshots(backupID string) ([]map[string]string, error) {
 func (a *App) RestoreSnapshot(snapshotID, destPath string) error {
 	writeDebugLog(fmt.Sprintf("RestoreSnapshot() called: snapshot=%s, dest=%s", snapshotID, destPath))
 
+	// Resolve PBS fields from multi-PBS default when legacy fields are empty
+	pbsCfg := a.config.EffectivePBS()
+
 	// Validate config
-	if err := a.config.Validate(); err != nil {
+	if err := pbsCfg.Validate(); err != nil {
 		return err
 	}
 
@@ -826,7 +835,7 @@ func (a *App) RestoreSnapshot(snapshotID, destPath string) error {
 	}
 
 	// Create restore manager
-	rm := NewRestoreManager(a.config)
+	rm := NewRestoreManager(pbsCfg)
 
 	// Parse timestamp from snapshotID
 	timestamp, err := time.Parse("2006-01-02T15:04:05Z", snapshotID)

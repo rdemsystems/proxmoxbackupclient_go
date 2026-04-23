@@ -198,6 +198,29 @@ func (c *Config) Validate() error {
 
 // ==================== MULTI-PBS HELPER METHODS ====================
 
+// EffectivePBS returns a Config whose legacy PBS fields (BaseURL, AuthID, etc.)
+// are guaranteed to reflect the active PBS server. If the legacy fields are
+// already set, the receiver is returned as-is. Otherwise, the default entry
+// from PBSServers is promoted into a shallow copy so callers that still read
+// legacy fields work seamlessly with multi-PBS configurations.
+func (c *Config) EffectivePBS() *Config {
+	if c.BaseURL != "" || len(c.PBSServers) == 0 {
+		return c
+	}
+	pbs, err := c.GetPBSServer("")
+	if err != nil {
+		return c
+	}
+	cp := *c
+	cp.BaseURL = pbs.BaseURL
+	cp.CertFingerprint = pbs.CertFingerprint
+	cp.AuthID = pbs.AuthID
+	cp.Secret = pbs.Secret
+	cp.Datastore = pbs.Datastore
+	cp.Namespace = pbs.Namespace
+	return &cp
+}
+
 // GetPBSServer returns a PBS server by ID, or the default if ID is empty
 func (c *Config) GetPBSServer(id string) (*PBSServer, error) {
 	// If no ID specified, use default
