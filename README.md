@@ -24,8 +24,8 @@ Don't want to self-host PBS? Use our managed service:
 
 ## 📚 Documentation
 
-- [Complete Proxmox Backup Guide](https://nimbus.rdem-systems.com/en/blog/complete-proxmox-backup-guide/?utm_source=github&utm_campaign=gui-client) ([🇫🇷 FR](https://nimbus.rdem-systems.com/blog/guide-complet-backup-proxmox/?utm_source=github&utm_campaign=gui-client)) — PBS deployment best practices
-- [Backup Windows with Proxmox Backup Server](https://nimbus.rdem-systems.com/en/blog/backup-windows-proxmox-backup-server/?utm_source=github&utm_campaign=gui-client) ([🇫🇷 FR](https://nimbus.rdem-systems.com/blog/sauvegarder-windows-proxmox-backup-server/?utm_source=github&utm_campaign=gui-client)) — Windows-specific deployment guide
+- **Complete Proxmox Backup Guide** — PBS deployment best practices ([🇬🇧 EN](https://nimbus.rdem-systems.com/en/blog/complete-proxmox-backup-guide/?utm_source=github&utm_campaign=gui-client) / [🇫🇷 FR](https://nimbus.rdem-systems.com/blog/guide-complet-backup-proxmox/?utm_source=github&utm_campaign=gui-client))
+- **Backup Windows with Proxmox Backup Server** — Windows-specific deployment guide ([🇬🇧 EN](https://nimbus.rdem-systems.com/en/blog/backup-windows-proxmox-backup-server/?utm_source=github&utm_campaign=gui-client) / [🇫🇷 FR](https://nimbus.rdem-systems.com/blog/sauvegarder-windows-proxmox-backup-server/?utm_source=github&utm_campaign=gui-client))
 
 ## ✨ Features
 
