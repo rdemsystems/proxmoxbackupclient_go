@@ -1,5 +1,9 @@
 # Nimbus Backup - Proxmox Backup Server Client
 
+[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/rdemsystems/NimbusBackupClient)](https://github.com/rdemsystems/NimbusBackupClient/releases)
+[![Documentation](https://img.shields.io/badge/docs-nimbus.rdem--systems.com-orange)](https://nimbus.rdem-systems.com/)
+
 Modern Windows backup client for Proxmox Backup Server with intuitive GUI interface.
 
 ## 🌐 RDEM Systems
@@ -16,7 +20,12 @@ Don't want to self-host PBS? Use our managed service:
 
 ## 📦 Download
 
-👉 **[Download Latest Release](https://github.com/rdem-systems/proxmoxbackupclient_go/releases)**
+👉 **[Download Latest Release](https://github.com/rdemsystems/NimbusBackupClient/releases)**
+
+## 📚 Documentation
+
+- [Complete Proxmox Backup Guide](https://nimbus.rdem-systems.com/en/blog/complete-proxmox-backup-guide/?utm_source=github&utm_campaign=gui-client) ([🇫🇷 FR](https://nimbus.rdem-systems.com/blog/guide-complet-backup-proxmox/?utm_source=github&utm_campaign=gui-client)) — PBS deployment best practices
+- [Backup Windows with Proxmox Backup Server](https://nimbus.rdem-systems.com/en/blog/backup-windows-proxmox-backup-server/?utm_source=github&utm_campaign=gui-client) ([🇫🇷 FR](https://nimbus.rdem-systems.com/blog/sauvegarder-windows-proxmox-backup-server/?utm_source=github&utm_campaign=gui-client)) — Windows-specific deployment guide
 
 ## ✨ Features
 
@@ -139,6 +148,18 @@ Key additions in this fork:
 - Comprehensive testing
 - CI/CD pipelines
 
+### Feature comparison
+
+| Feature                 | tizbac/proxmoxbackupclient_go | NimbusBackupClient (this fork) |
+|-------------------------|:-----------------------------:|:------------------------------:|
+| CLI mode                | ✅                             | ✅                              |
+| Wails GUI               | ❌                             | ✅                              |
+| Multi-language (FR/EN)  | ❌                             | ✅                              |
+| Real-time progress      | ❌                             | ✅                              |
+| Smart system exclusions | ❌                             | ✅                              |
+| CI/CD pipelines         | ❌                             | ✅                              |
+| Comprehensive tests     | ❌                             | ✅                              |
+
 ## 📄 License
 
 GPLv3 - See LICENSE file
@@ -150,6 +171,12 @@ Contributions are welcome! Priority areas:
 2. 🔄 Auto-update mechanism
 3. 📅 Scheduled backups
 4. 🔒 Code signing
+
+## About RDEM Systems
+
+NimbusBackupClient is developed and maintained by [RDEM Systems](https://www.rdem-systems.com/), a French infrastructure provider specialized in Proxmox VE/PBS managed services and NTP/NTS infrastructure.
+
+We operate [11 public NTS servers](https://github.com/jauderho/nts-servers) listed in the community reference, and provide [fully managed PBS hosting](https://nimbus.rdem-systems.com/?utm_source=github&utm_campaign=gui-client-about) for users who don't want to self-host.
 
 ---
 
